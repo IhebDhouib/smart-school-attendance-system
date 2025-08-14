@@ -1,0 +1,82 @@
+.classroom-box {
+  max-width: 600px;
+  margin: auto;
+  background-color: #f8faff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.classroom-box h2 {
+  color: #2b5dab;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.classroom-box form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.classroom-box label {
+  font-weight: 600;
+  color: #333;
+}
+
+.classroom-box input,
+.classroom-box select {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.classroom-box input:focus,
+.classroom-box select:focus {
+  border-color: #2b5dab;
+  outline: none;
+}
+
+.classroom-box button {
+  background-color: #2b5dab;
+  color: white;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.classroom-box button:hover {
+  background-color: #1f4680;
+}
+
+.classroom-box ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.classroom-box li {
+  background-color: #e8f0fe;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.classroom-box li button {
+  background-color: #ff4d4d;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.classroom-box li button:hover {
+  background-color: #d73737;
+}

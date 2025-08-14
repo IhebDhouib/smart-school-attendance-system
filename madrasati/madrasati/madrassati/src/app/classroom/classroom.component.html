@@ -1,0 +1,22 @@
+<div class="classroom-box">
+  <h2>إضافة فصل دراسي</h2>
+  <form (submit)="addClassroom(); $event.preventDefault()">
+    <label>اسم الفصل :</label>
+    <input [(ngModel)]="newClassroom.name" name="name" required />
+
+    <label>المستوى :</label>
+    <select [(ngModel)]="newClassroom.grade" name="grade" required>
+      <option *ngFor="let grade of grades" [value]="grade">{{ grade }}</option>
+    </select>
+
+    <button type="submit">إضافة</button>
+  </form>
+
+  <h2>قائمة الفصول الدراسية</h2>
+  <ul>
+    <li *ngFor="let classroom of classrooms">
+      {{ classroom.grade }} - {{ classroom.name }}
+      <button (click)="deleteClassroom(classroom._id)">حذف</button>
+    </li>
+  </ul>
+</div>

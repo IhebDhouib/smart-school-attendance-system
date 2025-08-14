@@ -1,0 +1,208 @@
+<div class="attendance-container">
+  <div class="header-section">
+    <h2 class="page-title">
+      <i class="fas fa-calendar-check"></i>
+      إدارة الحضور
+    </h2>
+    <p class="page-description">استشر الحضور حسب الصف والمادة</p>
+  </div>
+
+  <div class="filters-section">
+    <div class="filter-group">
+      <label for="classSelect">الفئة :</label>
+      <select 
+        id="classSelect" 
+        [(ngModel)]="selectedClassId" 
+        (change)="onClassChange()"
+        class="form-select">
+        <option value="">اختر فصلاً</option>
+        <option *ngFor="let classroom of classrooms" [value]="classroom._id">
+          {{classroom.name}} - {{classroom.grade}}
+        </option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="subjectSelect">الموضوع :</label>
+      <select 
+        id="subjectSelect" 
+        [(ngModel)]="selectedSubjectId" 
+        (change)="onSubjectChange()"
+        class="form-select"
+        [disabled]="!selectedClassId">
+        <option value="">اختر مادة</option>
+        <option *ngFor="let schedule of classSchedules" [value]="schedule._id">
+          {{schedule.subject}} - {{schedule.day}} {{schedule.startTime}}
+        </option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="dateRange">الفترة :</label>
+      <div class="date-range">
+        <input 
+          type="date" 
+          id="startDate"
+          [(ngModel)]="startDate" 
+          (change)="onDateRangeChange()"
+          class="form-input">
+        <span class="date-separator">إلى</span>
+        <input 
+          type="date" 
+          id="endDate"
+          [(ngModel)]="endDate" 
+          (change)="onDateRangeChange()"
+          class="form-input">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <button 
+        class="btn btn-primary" 
+        (click)="loadAttendanceData()"
+        [disabled]="!selectedClassId || !selectedSubjectId">
+        <i class="fas fa-search"></i>
+        عرض الحضور
+      </button>
+    </div>
+  </div>
+
+  <div class="content-section" *ngIf="attendanceData.length > 0">
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-icon">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{totalStudents}}</h3>
+          <p>إجمالي الطلاب</p>
+        </div>
+      </div>
+
+      <div class="stat-card present">
+        <div class="stat-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{averagePresent}}</h3>
+          <p>متوسط الحضور</p>
+        </div>
+      </div>
+
+      <div class="stat-card absent">
+        <div class="stat-icon">
+          <i class="fas fa-times-circle"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{averageAbsent}}</h3>
+          <p>متوسط الغياب</p>
+        </div>
+      </div>
+
+      <div class="stat-card rate">
+        <div class="stat-icon">
+          <i class="fas fa-percentage"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{attendanceRate}}%</h3>
+          <p>نسبة الحضور</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="table-section">
+      <div class="table-header">
+        <h3>Tableau des Présences</h3>
+        <div class="table-actions">
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input 
+              type="text" 
+              placeholder="Rechercher un étudiant..." 
+              [(ngModel)]="searchTerm"
+              (input)="filterStudents()"
+              class="search-input">
+          </div>
+          <button class="btn btn-export" (click)="exportToCSV()">
+            <i class="fas fa-download"></i>
+            Exporter CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="attendance-table">
+          <thead>
+            <tr>
+              <th class="student-header">Étudiant</th>
+              <th class="student-header">Matricule</th>
+              <th class="student-header">Nom du Père</th>
+              <th *ngFor="let date of lessonDates" class="date-header">
+                <div class="date-cell">
+                  <div class="date-day">{{formatDateDay(date)}}</div>
+                  <div class="date-full">{{formatDateFull(date)}}</div>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of filteredStudents; trackBy: trackByStudentId" class="student-row">
+              <td class="student-name">{{student.fullName}}</td>
+              <td class="student-matricule">{{student.matricule}}</td>
+              <td class="student-father">{{student.nomPere}}</td>
+              <td *ngFor="let date of lessonDates" class="attendance-cell">
+                <div class="attendance-indicator" 
+                     [ngClass]="getAttendanceStatus(student.matricule, date)"
+                     [title]="getAttendanceTooltip(student.matricule, date)">
+                  <i class="fas fa-circle" *ngIf="isPresent(student.matricule, date)"></i>
+                  <i class="far fa-circle" *ngIf="!isPresent(student.matricule, date)"></i>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination-section" *ngIf="totalPages > 1">
+        <div class="pagination-info">
+          Affichage {{(currentPage - 1) * itemsPerPage + 1}} إلى {{Math.min(currentPage * itemsPerPage, filteredStudents.length)}} 
+          sur {{filteredStudents.length}} étudiants
+        </div>
+        <div class="pagination-controls">
+          <button 
+            class="btn btn-pagination" 
+            (click)="previousPage()" 
+            [disabled]="currentPage === 1">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+          <span class="page-info">Page {{currentPage}} sur {{totalPages}}</span>
+          <button 
+            class="btn btn-pagination" 
+            (click)="nextPage()" 
+            [disabled]="currentPage === totalPages">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="selectedClassId && selectedSubjectId && attendanceData.length === 0">
+    <div class="empty-icon">
+      <i class="fas fa-calendar-times"></i>
+    </div>
+    <h3>Aucune donnée de présence</h3>
+    <p>Aucune donnée de présence trouvée pour la classe et la matière sélectionnées dans la période spécifiée.</p>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Chargement des données de présence...</p>
+  </div>
+</div>
+

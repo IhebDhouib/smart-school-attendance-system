@@ -1,0 +1,15 @@
+<div class="form-container">
+    
+
+    <div class="form-card">
+        <h2>التسجيل</h2>
+        <form (ngSubmit)="onRegister()">
+            <input type="text" [(ngModel)]="name" name="name" placeholder="الاسم" required />
+            <input type="email" [(ngModel)]="email" name="email" placeholder="البريد الإلكتروني" required />
+            <input type="password" [(ngModel)]="password" name="password" placeholder="كلمة المرور" required />
+            <button type="submit">تسجيل</button>
+            <p *ngIf="error" class="error-text">{{ error }}</p>
+            <p *ngIf="success" class="success-text">{{ success }}</p>
+        </form>
+    </div>
+</div>

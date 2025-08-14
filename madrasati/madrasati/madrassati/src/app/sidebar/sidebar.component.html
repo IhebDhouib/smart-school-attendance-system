@@ -1,0 +1,119 @@
+<!-- Toggle Button -->
+<button class="sidebar-toggle" 
+        (click)="toggleSidebar()" 
+        [attr.aria-label]="isCollapsed ? 'فتح القائمة' : 'إغلاق القائمة'"
+        [attr.aria-expanded]="!isCollapsed">
+  <i class="fas fa-bars" [class.rotated]="!isCollapsed" aria-hidden="true"></i>
+</button>
+
+<!-- Sidebar -->
+<aside class="sidebar" 
+       [class.collapsed]="isCollapsed && !isMobile"
+       [class.mobile-collapsed]="isCollapsed && isMobile"
+       [attr.aria-hidden]="isCollapsed">
+  <!-- Header -->
+  <div class="sidebar-header">
+    <div class="logo">
+      <i class="fas fa-school" aria-hidden="true"></i>
+      <span>Madrasati</span>
+    </div>
+    <button class="close-sidebar" 
+            (click)="toggleSidebar()" 
+            *ngIf="isMobile"
+            aria-label="إغلاق القائمة">
+      <i class="fas fa-times" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <!-- Navigation Menu -->
+  <nav class="sidebar-nav" role="navigation" aria-label="الرئيسية">
+    <ul class="nav-list" role="list">
+      <li class="nav-item" role="listitem">
+        <a routerLink="/dashboard" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="لوحة التحكم"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
+          <span>لوحة التحكم</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/student" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الطلاب"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-user-graduate" aria-hidden="true"></i>
+          <span>الطلاب</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/class" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الصفوف"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-book" aria-hidden="true"></i>
+          <span>الصفوف</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/teacher" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="المعلمون"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-chalkboard-teacher" aria-hidden="true"></i>
+          <span>المعلمون</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/schedule" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الجدول الزمني"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-calendar-week" aria-hidden="true"></i>
+          <span>الجدول الزمني</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/attendance" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الحضور"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-check-circle" aria-hidden="true"></i>
+          <span>الحضور</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- Footer with Logout -->
+  <div class="sidebar-footer">
+    <button class="nav-link logout-btn" 
+            (click)="logout()" 
+            aria-label="تسجيل الخروج"
+            data-tooltip="تسجيل الخروج">
+      <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+      <span>تسجيل الخروج</span>
+    </button>
+  </div>
+</aside>
+
+<!-- Overlay for Mobile -->
+<div class="sidebar-overlay" 
+     *ngIf="!isCollapsed && isMobile" 
+     (click)="toggleSidebar()"
+     [class.active]="!isCollapsed && isMobile"
+     role="button" 
+     tabindex="0"
+     aria-label="إغلاق القائمة"></div>

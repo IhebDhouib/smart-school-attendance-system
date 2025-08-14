@@ -1,0 +1,13 @@
+<div class="form-container">
+    <div class="form-card">
+        <h2>تسجيل الدخول</h2>
+        <form (ngSubmit)="onLogin()">
+            <input type="email" [(ngModel)]="email" name="email" required placeholder="البريد الإلكتروني" />
+            <input type="password" [(ngModel)]="password" name="password" required placeholder="كلمة المرور" />
+            <button type="submit">تسجيل الدخول</button>
+            <p *ngIf="error" class="error-text">{{ error }}</p>
+        </form>
+    </div>
+
+    
+</div>

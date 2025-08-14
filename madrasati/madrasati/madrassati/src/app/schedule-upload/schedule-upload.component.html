@@ -1,0 +1,36 @@
+<div class="form-container">
+    <div class="form-card">
+        <h2>تحميل الجدول الدراسي</h2>
+        <form (ngSubmit)="onSubmit()" #uploadForm="ngForm">
+            <div class="form-group">
+                <label for="className" class="form-label">اسم الفصل</label>
+                <select id="classroom" [(ngModel)]="selectedClass" name="classroom" class="form-control">
+                    <option [ngValue]="null" disabled>اختر فصلاً دراسياً</option>
+                    <option *ngFor="let classroom of classrooms" [ngValue]="classroom">
+                        {{ classroom.name }} ({{ classroom.grade }})
+                    </option>
+                </select>
+            </div>
+
+
+            <div class="form-group file-upload-group">
+                <label for="file" class="form-label">ملف Excel</label>
+                <div class="file-input-wrapper">
+                    <input id="file" type="file" (change)="onFileChange($event)" accept=".xlsx,.xls" required
+                        #fileInput />
+                    <label for="file" class="file-input-label">
+                        <span class="file-icon">📄</span>
+                        <span class="file-text">{{ file ? file.name : 'اختر ملف Excel...' }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" [disabled]="!uploadForm.valid || loading" [class.loading]="loading">
+                {{ loading ? 'جاري التحميل...' : 'تحميل الجدول' }}
+            </button>
+
+            <p *ngIf="error" class="error-text">{{ error }}</p>
+            <p *ngIf="success" class="success-text">{{ success }}</p>
+        </form>
+    </div>
+</div>

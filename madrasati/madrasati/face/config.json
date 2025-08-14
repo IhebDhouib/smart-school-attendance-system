@@ -1,0 +1,8 @@
+{
+    "tolerance": 0.6,
+    "model": "hog",
+    "scale_factor": 0.25,
+    "recognition_cooldown": 30,
+    "save_unknown_faces": true,
+    "log_level": "INFO"
+}

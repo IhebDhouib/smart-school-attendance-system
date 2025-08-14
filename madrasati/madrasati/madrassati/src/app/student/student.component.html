@@ -1,0 +1,148 @@
+<div class="main-content ml-[150px] p-6">
+  <div class="student-import">
+    <h3>استيراد الطلاب عبر Excel</h3>
+    <div class="import-controls">
+      <input 
+        type="file" 
+        (change)="onExcelSelected($event)" 
+        accept=".xlsx, .xls"
+      />
+      <button (click)="importExcel()">
+        <i class="fas fa-file-import"></i> استيراد
+      </button>
+    </div>
+  </div>
+
+  <div class="student-container">
+    <div class="student-form">
+      <h2>
+        <i class="fas fa-user-graduate"></i>
+        {{ isEditing ? 'تعديل طالب' : 'إضافة طالب' }}
+      </h2>
+
+      <div class="student-grid">
+        <div class="form-group">
+          <label>رقم التسجيل</label>
+          <input type="text" [(ngModel)]="newStudent.matricule" placeholder="رقم التسجيل" required />
+        </div>
+
+        <div class="form-group">
+          <label>الاسم الكامل</label>
+          <input type="text" [(ngModel)]="newStudent.fullName" placeholder="الاسم الكامل" />
+        </div>
+
+        <div class="form-group">
+          <label>اسم الأب</label>
+          <input type="text" [(ngModel)]="newStudent.nomPere" placeholder="اسم الأب" />
+        </div>
+
+        <div class="form-group">
+          <label>تاريخ الميلاد</label>
+          <input type="date" [(ngModel)]="newStudent.dateNaissance" />
+        </div>
+
+        <div class="form-group">
+          <label>الفئة</label>
+          <select [(ngModel)]="newStudent.classId">
+            <option value="" disabled>اختر فصلاً</option>
+            <option *ngFor="let c of classrooms" [value]="c._id">{{ c.name }} - {{ c.grade }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>الصور</label>
+          <input type="file" (change)="onFileSelected($event)" multiple />
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button *ngIf="!isEditing" (click)="addStudent()" class="success">
+          <i class="fas fa-plus-circle"></i> إضافة
+        </button>
+        <button *ngIf="isEditing" (click)="updateStudent()" class="warning">
+          <i class="fas fa-save"></i> تحديث
+        </button>
+        <button (click)="resetForm()" class="outline">
+          <i class="fas fa-times-circle"></i> إلغاء
+        </button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <h3><i class="fas fa-filter"></i> تصفية الطلاب</h3>
+      <div class="filter-grid">
+        <div class="form-group">
+          <label>البحث</label>
+          <div class="input-icon">
+            <input type="text" [(ngModel)]="searchText" (input)="applyFilters()" placeholder="الاسم، رقم التسجيل، الأب..." />
+            <i class="fas fa-search"></i>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>الفئة</label>
+          <select [(ngModel)]="selectedClass" (change)="applyFilters()">
+            <option value="">جميع الفئات</option>
+            <option *ngFor="let c of classrooms" [value]="c._id">{{ c.name }} - {{ c.grade }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>سنة الميلاد</label>
+          <select [(ngModel)]="selectedYear" (change)="applyFilters()">
+            <option value="">جميع السنوات</option>
+            <option *ngFor="let year of birthYears" [value]="year">{{ year }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="student-list">
+      <div class="list-header">
+        <h3><i class="fas fa-list-ol"></i> قائمة الطلاب</h3>
+        <span class="badge">{{ filteredStudents.length }} طالب (طلاب)</span>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th (click)="sortBy('matricule')">رقم التسجيل</th>
+              <th (click)="sortBy('fullName')">الاسم الكامل</th>
+              <th>الأب</th>
+              <th (click)="sortBy('dateNaissance')">الميلاد</th>
+              <th>الفئة</th>
+              <th>الصور</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let student of filteredStudents">
+              <td>{{ student.matricule }}</td>
+              <td>{{ student.fullName }}</td>
+              <td>{{ student.nomPere }}</td>
+              <td>{{ student.dateNaissance | date: 'mediumDate' }}</td>
+              <td>{{ getClassroomName(student.classId) }}</td>
+              <td>
+                <div class="photos">
+                  <img *ngFor="let p of student.photos" [src]="'http://localhost:3000/' + p" alt="photo" />
+                </div>
+              </td>
+              <td>
+                <button class="info" (click)="editStudent(student)">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button class="danger" (click)="deleteStudent(student._id!)">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div *ngIf="filteredStudents.length === 0" class="empty-state">
+        <i class="fas fa-user-slash"></i>
+        <p>لم يتم العثور على أي طالب بهذه المعايير.</p>
+      </div>
+    </div>
+  </div>
+</div>

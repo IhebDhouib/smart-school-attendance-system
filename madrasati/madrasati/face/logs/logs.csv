@@ -1,0 +1,338 @@
+Nom,Action,DateTime
+wassim,entrée,2025-08-04 17:23:56
+wassim,sortie (durée: 0:00:30.516600),2025-08-04 17:24:34
+wassim,entrée,2025-08-09 23:29:02
+iheb,entrée,2025-08-09 23:29:03
+aziz,entrée,2025-08-09 23:29:30
+wassim,sortie_automatique,2025-08-09 23:29:32
+wassim,entrée,2025-08-09 23:29:34
+iheb,sortie_automatique,2025-08-09 23:29:34
+aziz,sortie_automatique,2025-08-09 23:30:00
+inconnu_6247e189_20250809_233001,visage_inconnu_détecté,2025-08-09 23:30:01
+aziz,entrée,2025-08-09 23:30:02
+wassim,sortie_automatique,2025-08-09 23:30:04
+wassim,entrée,2025-08-09 23:30:05
+inconnu_1a244300_20250809_233012,visage_inconnu_détecté,2025-08-09 23:30:12
+aziz,sortie_automatique,2025-08-09 23:30:18
+wassim,sortie_automatique,2025-08-09 23:30:18
+naim,entrée,2025-08-09 23:37:21
+wassim,entrée,2025-08-09 23:37:32
+naim,sortie_automatique,2025-08-09 23:37:51
+aziz,entrée,2025-08-09 23:38:05
+inconnu_9ddffdfc_20250809_233814,visage_inconnu_détecté,2025-08-09 23:38:14
+inconnu_c739547c_20250809_233832,visage_inconnu_détecté,2025-08-09 23:38:32
+wassim,sortie (durée: 0:00:30.079408),2025-08-09 23:38:32
+wassim,entrée,2025-08-09 23:38:33
+aziz,sortie_automatique,2025-08-09 23:38:36
+iheb,entrée,2025-08-09 23:38:39
+naim,entrée,2025-08-09 23:38:48
+wassim,sortie_automatique,2025-08-09 23:39:03
+iheb,sortie_automatique,2025-08-09 23:39:03
+naim,sortie_automatique,2025-08-09 23:39:03
+wassim,entrée,2025-08-09 23:46:03
+iheb,entrée,2025-08-09 23:46:11
+wassim,sortie_automatique,2025-08-09 23:46:34
+wassim,entrée,2025-08-09 23:46:40
+wassim,sortie_automatique,2025-08-09 23:47:10
+iheb,sortie (durée: 0:00:30.009149),2025-08-09 23:47:11
+wassim,entrée,2025-08-09 23:47:48
+wassim,sortie_automatique,2025-08-09 23:48:18
+iheb,entrée,2025-08-09 23:48:19
+wassim,entrée,2025-08-09 23:48:20
+inconnu_4364c825_20250809_234832,visage_inconnu_détecté,2025-08-09 23:48:32
+iheb,sortie_automatique,2025-08-09 23:48:35
+wassim,sortie_automatique,2025-08-09 23:48:35
+iheb,entrée,2025-08-10 00:02:18
+mariam,entrée,2025-08-10 00:02:29
+nermine,entrée,2025-08-10 00:02:32
+iheb,sortie_automatique,2025-08-10 00:02:48
+iheb,entrée,2025-08-10 00:02:52
+naim,entrée,2025-08-10 00:02:59
+mariam,sortie_automatique,2025-08-10 00:03:00
+nermine,sortie_automatique,2025-08-10 00:03:02
+mariam,entrée,2025-08-10 00:03:08
+iheb,sortie_automatique,2025-08-10 00:03:22
+naim,sortie_automatique,2025-08-10 00:03:29
+iheb,entrée,2025-08-10 00:03:33
+nermine,entrée,2025-08-10 00:03:37
+mariam,sortie_automatique,2025-08-10 00:03:38
+inconnu_a6286acc_20250810_000401,visage_inconnu_détecté,2025-08-10 00:04:01
+iheb,sortie_automatique,2025-08-10 00:04:04
+inconnu_162e50e8_20250810_000413,visage_inconnu_détecté,2025-08-10 00:04:13
+iheb,entrée,2025-08-10 00:04:14
+nermine,sortie (durée: 0:00:30.452053),2025-08-10 00:04:37
+wassim,entrée,2025-08-10 00:04:46
+inconnu_845dc45b_20250810_000502,visage_inconnu_détecté,2025-08-10 00:05:02
+iheb,sortie (durée: 0:00:30.060268),2025-08-10 00:05:14
+wassim,sortie_automatique,2025-08-10 00:05:17
+iheb,entrée,2025-08-10 00:05:17
+naim,entrée,2025-08-10 00:05:28
+wassim,entrée,2025-08-10 00:05:33
+inconnu_09c94b31_20250810_000537,visage_inconnu_détecté,2025-08-10 00:05:37
+inconnu_cfd4b048_20250810_000546,visage_inconnu_détecté,2025-08-10 00:05:46
+iheb,sortie_automatique,2025-08-10 00:05:48
+iheb,entrée,2025-08-10 00:05:48
+naim,sortie_automatique,2025-08-10 00:05:58
+wassim,sortie_automatique,2025-08-10 00:06:03
+wassim,entrée,2025-08-10 00:06:12
+naim,entrée,2025-08-10 00:06:12
+iheb,sortie_automatique,2025-08-10 00:06:18
+iheb,entrée,2025-08-10 00:06:21
+aziz,entrée,2025-08-10 00:06:21
+inconnu_b99b1f38_20250810_000631,visage_inconnu_détecté,2025-08-10 00:06:31
+wassim,sortie_automatique,2025-08-10 00:06:42
+naim,sortie_automatique,2025-08-10 00:06:42
+wassim,entrée,2025-08-10 00:06:49
+iheb,sortie_automatique,2025-08-10 00:06:51
+aziz,sortie_automatique,2025-08-10 00:06:51
+iheb,entrée,2025-08-10 00:07:03
+naim,entrée,2025-08-10 00:07:06
+inconnu_18e19adb_20250810_000709,visage_inconnu_détecté,2025-08-10 00:07:09
+wassim,sortie_automatique,2025-08-10 00:07:19
+wassim,entrée,2025-08-10 00:07:21
+inconnu_5f882433_20250810_000725,visage_inconnu_détecté,2025-08-10 00:07:25
+iheb,sortie_automatique,2025-08-10 00:07:33
+iheb,entrée,2025-08-10 00:07:34
+naim,sortie_automatique,2025-08-10 00:07:36
+naim,entrée,2025-08-10 00:07:44
+wassim,sortie_automatique,2025-08-10 00:07:51
+wassim,entrée,2025-08-10 00:08:12
+naim,sortie_automatique,2025-08-10 00:08:15
+inconnu_fee2c750_20250810_000821,visage_inconnu_détecté,2025-08-10 00:08:21
+inconnu_a4a01c28_20250810_000828,visage_inconnu_détecté,2025-08-10 00:08:28
+iheb,sortie (durée: 0:00:30.321899),2025-08-10 00:08:34
+naim,entrée,2025-08-10 00:08:35
+iheb,entrée,2025-08-10 00:08:37
+nermine,entrée,2025-08-10 00:09:01
+mariam,entrée,2025-08-10 00:09:02
+naim,sortie_automatique,2025-08-10 00:09:05
+naim,entrée,2025-08-10 00:09:10
+wassim,sortie (durée: 0:00:30.164818),2025-08-10 00:09:13
+nermine,sortie_automatique,2025-08-10 00:09:31
+mariam,sortie_automatique,2025-08-10 00:09:33
+iheb,sortie (durée: 0:00:30.380361),2025-08-10 00:09:37
+naim,sortie_automatique,2025-08-10 00:09:41
+wassim,entrée,2025-08-10 00:09:52
+aziz,entrée,2025-08-10 00:09:53
+nermine,entrée,2025-08-10 00:09:57
+naim,entrée,2025-08-10 00:09:57
+mariam,entrée,2025-08-10 00:10:07
+iheb,entrée,2025-08-10 00:10:18
+wassim,sortie_automatique,2025-08-10 00:10:22
+aziz,sortie_automatique,2025-08-10 00:10:23
+nermine,sortie_automatique,2025-08-10 00:10:27
+naim,sortie_automatique,2025-08-10 00:10:27
+mariam,sortie_automatique,2025-08-10 00:10:30
+iheb,sortie_automatique,2025-08-10 00:10:30
+iheb,entrée,2025-08-10 00:29:15
+naim,entrée,2025-08-10 00:29:18
+wassim,entrée,2025-08-10 00:29:19
+aziz,entrée,2025-08-10 00:29:21
+nermine,entrée,2025-08-10 00:29:22
+naim,sortie_automatique,2025-08-10 00:29:48
+wassim,sortie_automatique,2025-08-10 00:29:49
+aziz,sortie_automatique,2025-08-10 00:29:51
+aziz,entrée,2025-08-10 00:29:56
+wassim,entrée,2025-08-10 00:30:03
+naim,entrée,2025-08-10 00:30:10
+iheb,sortie (durée: 0:00:30.407465),2025-08-10 00:30:15
+iheb,entrée,2025-08-10 00:30:16
+inconnu_87265b46_20250810_003017,visage_inconnu_détecté,2025-08-10 00:30:17
+nermine,sortie (durée: 0:00:30.059687),2025-08-10 00:30:23
+aziz,sortie_automatique,2025-08-10 00:30:26
+wassim,sortie_automatique,2025-08-10 00:30:33
+naim,sortie_automatique,2025-08-10 00:30:40
+naim,entrée,2025-08-10 00:30:44
+iheb,sortie_automatique,2025-08-10 00:30:46
+nermine,entrée,2025-08-10 00:30:50
+iheb,entrée,2025-08-10 00:30:52
+mariam,entrée,2025-08-10 00:31:13
+naim,sortie_automatique,2025-08-10 00:31:14
+nermine,sortie_automatique,2025-08-10 00:31:20
+nermine,entrée,2025-08-10 00:31:42
+mariam,sortie_automatique,2025-08-10 00:31:44
+wassim,entrée,2025-08-10 00:31:46
+naim,entrée,2025-08-10 00:31:49
+iheb,sortie (durée: 0:00:30.456419),2025-08-10 00:31:53
+inconnu_353e87b4_20250810_003156,visage_inconnu_détecté,2025-08-10 00:31:56
+iheb,entrée,2025-08-10 00:31:58
+nermine,sortie_automatique,2025-08-10 00:32:05
+wassim,sortie_automatique,2025-08-10 00:32:05
+naim,sortie_automatique,2025-08-10 00:32:05
+iheb,sortie_automatique,2025-08-10 00:32:05
+iheb,entrée,2025-08-10 13:40:12
+wassim,entrée,2025-08-10 13:40:23
+iheb,sortie (durée: 0:00:31.347419),2025-08-10 13:40:45
+wassim,sortie_automatique,2025-08-10 13:40:45
+iheb,entrée,2025-08-10 13:50:11
+wassim,entrée,2025-08-10 13:50:23
+iheb,sortie_automatique,2025-08-10 13:50:41
+iheb,entrée,2025-08-10 13:50:44
+wassim,sortie_automatique,2025-08-10 13:50:53
+wassim,entrée,2025-08-10 13:51:40
+elonmusk,entrée,2025-08-10 13:51:44
+iheb,sortie (durée: 0:00:30.493318),2025-08-10 13:51:45
+iheb,entrée,2025-08-10 13:51:48
+aziz,entrée,2025-08-10 13:51:49
+elonmusk,sortie_automatique,2025-08-10 13:52:15
+iheb,sortie_automatique,2025-08-10 13:52:18
+aziz,sortie_automatique,2025-08-10 13:52:20
+iheb,entrée,2025-08-10 13:52:26
+wassim,sortie (durée: 0:01:01.400825),2025-08-10 13:53:12
+iheb,sortie (durée: 0:01:01.787114),2025-08-10 13:53:31
+wassim,entrée,2025-08-10 14:14:21
+wassim,sortie_automatique,2025-08-10 14:14:51
+wassim,entrée,2025-08-10 14:14:51
+aziz,entrée,2025-08-10 14:14:58
+iheb,entrée,2025-08-10 14:14:58
+naim,entrée,2025-08-10 14:15:00
+wassim,sortie_automatique,2025-08-10 14:15:22
+aziz,sortie_automatique,2025-08-10 14:15:28
+iheb,sortie_automatique,2025-08-10 14:15:28
+naim,sortie_automatique,2025-08-10 14:15:30
+naim,entrée,2025-08-10 14:15:34
+wassim,entrée,2025-08-10 14:15:51
+aziz,entrée,2025-08-10 14:16:35
+naim,sortie (durée: 0:00:30.576257),2025-08-10 14:16:36
+iheb,entrée,2025-08-10 14:16:41
+naim,entrée,2025-08-10 14:16:47
+wassim,sortie (durée: 0:00:30.137873),2025-08-10 14:16:52
+wassim,entrée,2025-08-10 14:16:59
+aziz,sortie_automatique,2025-08-10 14:17:05
+iheb,sortie_automatique,2025-08-10 14:17:11
+iheb,entrée,2025-08-10 14:17:12
+naim,sortie_automatique,2025-08-10 14:17:17
+iheb,sortie_automatique,2025-08-10 14:17:42
+iheb,entrée,2025-08-10 14:17:44
+wassim,sortie (durée: 0:00:30.807680),2025-08-10 14:18:01
+iheb,sortie_automatique,2025-08-10 14:18:01
+naim,entrée,2025-08-10 14:58:35
+wassim,entrée,2025-08-10 14:58:56
+naim,sortie_automatique,2025-08-10 14:59:05
+naim,entrée,2025-08-10 14:59:18
+aziz,entrée,2025-08-10 14:59:25
+wassim,sortie_automatique,2025-08-10 14:59:26
+naim,sortie_automatique,2025-08-10 14:59:48
+naim,entrée,2025-08-10 14:59:56
+aziz,sortie_automatique,2025-08-10 14:59:56
+wassim,entrée,2025-08-10 15:00:01
+aziz,entrée,2025-08-10 15:00:25
+wassim,sortie_automatique,2025-08-10 15:00:31
+wassim,entrée,2025-08-10 15:00:31
+aziz,sortie_automatique,2025-08-10 15:00:55
+iheb,entrée,2025-08-10 15:00:58
+inconnu_8eab9e03_20250810_150100,visage_inconnu_détecté,2025-08-10 15:01:00
+wassim,sortie_automatique,2025-08-10 15:01:03
+aziz,entrée,2025-08-10 15:01:03
+wassim,entrée,2025-08-10 15:01:09
+naim,sortie (durée: 0:01:01.879301),2025-08-10 15:01:28
+iheb,sortie_automatique,2025-08-10 15:01:28
+aziz,sortie_automatique,2025-08-10 15:01:33
+aziz,entrée,2025-08-10 15:01:36
+naim,entrée,2025-08-10 15:01:39
+aziz,sortie_automatique,2025-08-10 15:02:06
+naim,sortie_automatique,2025-08-10 15:02:09
+wassim,sortie (durée: 0:00:31.966686),2025-08-10 15:02:11
+aziz,entrée,2025-08-10 15:02:33
+wassim,entrée,2025-08-10 15:02:35
+aziz,sortie_automatique,2025-08-10 15:03:04
+wassim,sortie (durée: 0:00:30.144966),2025-08-10 15:03:10
+wassim,entrée,2025-08-10 15:26:30
+inconnu_e8d960bb_20250810_152723,visage_inconnu_détecté,2025-08-10 15:27:23
+inconnu_8d7a3b5e_20250810_152723,visage_inconnu_détecté,2025-08-10 15:27:23
+inconnu_14a263ce_20250810_152723,visage_inconnu_détecté,2025-08-10 15:27:23
+aziz,entrée,2025-08-10 15:27:33
+nermine,entrée,2025-08-10 15:27:49
+naim,entrée,2025-08-10 15:27:59
+wassim,sortie (durée: 0:01:01.500221),2025-08-10 15:28:03
+aziz,sortie_automatique,2025-08-10 15:28:04
+nermine,sortie_automatique,2025-08-10 15:28:19
+naim,sortie_automatique,2025-08-10 15:28:35
+inconnu_1f56fa66_20250810_152843,visage_inconnu_détecté,2025-08-10 15:28:43
+iheb,entrée,2025-08-10 15:28:46
+iheb,sortie_automatique,2025-08-10 15:28:59
+wassim,entrée,2025-08-10 15:30:30
+inconnu_50dd2f06_20250810_153047,visage_inconnu_détecté,2025-08-10 15:30:47
+aziz,entrée,2025-08-10 15:30:50
+wassim,sortie_automatique,2025-08-10 15:31:00
+wassim,entrée,2025-08-10 15:31:02
+aziz,sortie_automatique,2025-08-10 15:31:10
+wassim,sortie_automatique,2025-08-10 15:31:10
+wassim,entrée,2025-08-10 15:31:55
+wassim,sortie_automatique,2025-08-10 15:32:25
+iheb,entrée,2025-08-10 15:32:27
+wassim,entrée,2025-08-10 15:32:50
+aziz,entrée,2025-08-10 15:32:58
+iheb,sortie_automatique,2025-08-10 15:32:58
+inconnu_3f3a5713_20250810_153259,visage_inconnu_détecté,2025-08-10 15:32:59
+inconnu_4bdac0d6_20250810_153314,visage_inconnu_détecté,2025-08-10 15:33:14
+iheb,entrée,2025-08-10 15:33:18
+wassim,sortie_automatique,2025-08-10 15:33:20
+aziz,sortie_automatique,2025-08-10 15:33:28
+inconnu_af6c7a45_20250810_153342,visage_inconnu_détecté,2025-08-10 15:33:42
+iheb,sortie_automatique,2025-08-10 15:33:49
+iheb,entrée,2025-08-10 15:33:57
+wassim,entrée,2025-08-10 15:34:05
+iheb,sortie_automatique,2025-08-10 15:34:28
+aziz,entrée,2025-08-10 15:34:28
+iheb,entrée,2025-08-10 15:34:31
+wassim,sortie (durée: 0:00:30.204713),2025-08-10 15:34:40
+aziz,sortie_automatique,2025-08-10 15:34:42
+iheb,sortie_automatique,2025-08-10 15:34:42
+wassim,entrée,2025-08-10 15:38:53
+inconnu_cf547fd9_20250810_153937,visage_inconnu_détecté,2025-08-10 15:39:37
+wassim,sortie (durée: 0:01:01.183829),2025-08-10 15:40:14
+iheb,entrée,2025-08-10 15:40:56
+iheb,sortie_automatique,2025-08-10 15:41:26
+iheb,entrée,2025-08-10 15:41:38
+iheb,sortie_automatique,2025-08-10 15:42:08
+iheb,entrée,2025-08-11 14:08:11
+ahmed,entrée,2025-08-11 14:08:17
+iheb,sortie (durée: 0:00:30.850389),2025-08-11 14:08:51
+ahmed,sortie_automatique,2025-08-11 14:08:53
+iheb,entrée,2025-08-11 14:09:16
+wassim,entrée,2025-08-11 14:09:47
+iheb,sortie (durée: 0:00:30.335853),2025-08-11 14:10:02
+wassim,sortie_automatique,2025-08-11 14:10:02
+wassim,entrée,2025-08-11 14:10:31
+iheb,entrée,2025-08-11 14:10:31
+wassim,sortie_automatique,2025-08-11 14:11:01
+iheb,sortie_automatique,2025-08-11 14:11:01
+iheb,entrée,2025-08-11 14:11:02
+wassim,entrée,2025-08-11 14:11:02
+iheb,sortie_automatique,2025-08-11 14:11:04
+wassim,sortie_automatique,2025-08-11 14:11:04
+11139332,entrée,2025-08-12 16:29:30
+inconnu_e49bd961_20250812_162933,visage_inconnu_détecté,2025-08-12 16:29:34
+inconnu_6f0511cd_20250812_162940,visage_inconnu_détecté,2025-08-12 16:29:40
+11139332,sortie_automatique,2025-08-12 16:29:59
+11139332,entrée,2025-08-12 16:32:01
+inconnu_2018f7ab_20250812_163245,visage_inconnu_détecté,2025-08-12 16:32:45
+inconnu_4547cfdf_20250812_163318,visage_inconnu_détecté,2025-08-12 16:33:18
+inconnu_ab6f90cf_20250812_163358,visage_inconnu_détecté,2025-08-12 16:33:58
+inconnu_23983558_20250812_163454,visage_inconnu_détecté,2025-08-12 16:34:54
+11139332,sortie (durée: 0:02:34.694523),2025-08-12 16:35:06
+11139332,entrée,2025-08-12 16:35:09
+inconnu_af8b0065_20250812_163529,visage_inconnu_détecté,2025-08-12 16:35:29
+inconnu_1309561c_20250812_163540,visage_inconnu_détecté,2025-08-12 16:35:40
+inconnu_0ec6e447_20250812_163607,visage_inconnu_détecté,2025-08-12 16:36:07
+11139332,sortie (durée: 0:00:31.691817),2025-08-12 16:36:12
+11139332,entrée,2025-08-12 16:36:13
+inconnu_1c8186cb_20250812_163639,visage_inconnu_détecté,2025-08-12 16:36:39
+11139332,sortie (durée: 0:00:30.739095),2025-08-12 16:37:15
+11139332,entrée,2025-08-12 16:37:17
+inconnu_64e3a124_20250812_163738,visage_inconnu_détecté,2025-08-12 16:37:38
+11139332,sortie_automatique,2025-08-12 16:37:48
+11139332,entrée,2025-08-12 16:37:51
+11139332,sortie_automatique,2025-08-12 16:38:21
+11139332,entrée,2025-08-12 16:38:22
+inconnu_bd3bf055_20250812_163937,visage_inconnu_détecté,2025-08-12 16:39:37
+11139332,sortie (durée: 0:01:02.824108),2025-08-12 16:39:56
+11139332,entrée,2025-08-12 16:39:59
+11139332,sortie_automatique,2025-08-12 16:40:04
+11139332,entrée,2025-08-13 15:48:18
+11139332,sortie_automatique,2025-08-13 15:48:48
+11139332,entrée,2025-08-13 15:48:50
+11139332,sortie (durée: 0:01:00.571188),2025-08-13 15:50:19
+11139332,entrée,2025-08-13 23:16:40
+11139332,sortie (durée: 0:01:31.496121),2025-08-13 23:18:27

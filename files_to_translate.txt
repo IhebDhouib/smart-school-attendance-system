@@ -1,0 +1,9 @@
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/sidebar/sidebar.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/pages/login/login.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/pages/register/register.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/attendance/attendance.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/classroom/classroom.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/student/student.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/teacher/teacher.component.html
+/home/ubuntu/madrasati/madrasati/madrasati/madrassati/src/app/schedule-upload/schedule-upload.component.html
+

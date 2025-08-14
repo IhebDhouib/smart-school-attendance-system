@@ -1,0 +1,412 @@
+/* Import de polices Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Variables CSS pour la cohérence des couleurs */
+:root {
+    --primary-color: #2563eb;
+    --primary-dark: #1d4ed8;
+    --secondary-color: #f8fafc;
+    --accent-color: #0ea5e9;
+    --success-color: #10b981;
+    --error-color: #ef4444;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --border-color: #e2e8f0;
+    --shadow-light: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-heavy: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Reset et styles de base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--gradient-bg);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: var(--text-primary);
+}
+
+/* Container principal */
+.form-container {
+    width: 100%;
+    max-width: 420px;
+    position: relative;
+}
+
+/* Effet de particules en arrière-plan */
+.form-container::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    left: -50px;
+    right: -50px;
+    bottom: -50px;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Carte de formulaire */
+.form-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    box-shadow: var(--shadow-heavy);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Effet de brillance sur la carte */
+.form-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.form-card:hover::before {
+    left: 100%;
+}
+
+/* Styles spécifiques pour la page d'inscription */
+.form-card h2 {
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    position: relative;
+}
+
+/* Adaptation pour "Register" */
+.form-card h2:contains("Register") {
+    color: var(--primary-color);
+}
+
+/* Espacement spécial pour 3 champs */
+form input[type="text"]+input[type="email"] {
+    margin-top: -0.25rem;
+}
+
+/* Bouton Register avec couleur légèrement différente */
+button[type="submit"]:has-text("Register") {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+/* Alternative pour cibler le bouton Register si la pseudo-classe ne fonctionne pas */
+form:has(input[name="name"]) button[type="submit"] {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+form:has(input[name="name"]) button[type="submit"]:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* Ligne décorative sous le titre */
+.form-card h2::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: var(--gradient-bg);
+    border-radius: 2px;
+}
+
+/* Formulaire */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Champs de saisie */
+input[type="email"],
+input[type="password"],
+input[type="text"] {
+    width: 100%;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: white;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Placeholder styling */
+input::placeholder {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+/* Animation pour les champs */
+input {
+    position: relative;
+}
+
+input:focus {
+    animation: inputFocus 0.3s ease-out;
+}
+
+@keyframes inputFocus {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Bouton de connexion */
+button[type="submit"] {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    background: var(--gradient-bg);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+/* Effet hover sur le bouton */
+button[type="submit"]:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* Effet de vague sur le bouton */
+button[type="submit"]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+button[type="submit"]:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Message d'erreur */
+.error-text {
+    color: var(--error-color);
+    font-size: 0.875rem;
+    text-align: center;
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid var(--error-color);
+    animation: errorSlide 0.3s ease-out;
+}
+
+/* Message de succès */
+.success-text {
+    color: var(--success-color);
+    font-size: 0.875rem;
+    text-align: center;
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid var(--success-color);
+    animation: successSlide 0.3s ease-out;
+    font-weight: 500;
+}
+
+@keyframes successSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes errorSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* États de validation */
+input.ng-valid.ng-touched {
+    border-color: var(--success-color);
+}
+
+input.ng-invalid.ng-touched {
+    border-color: var(--error-color);
+}
+
+/* Validation spécifique pour les champs requis */
+input[required].ng-invalid.ng-touched {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+input[required].ng-valid.ng-touched {
+    border-color: var(--success-color);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Icônes pour les champs (optionnel) */
+.input-group {
+    position: relative;
+}
+
+.input-group input {
+    padding-left: 3rem;
+}
+
+.input-group::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background-size: contain;
+    opacity: 0.5;
+    z-index: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .form-card {
+        padding: 2rem 1.5rem;
+        margin: 1rem;
+    }
+
+    .form-card h2 {
+        font-size: 1.75rem;
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+        padding: 0.875rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    button[type="submit"] {
+        padding: 0.875rem 1.25rem;
+        font-size: 1rem;
+    }
+}
+
+/* Mode sombre (optionnel) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+        --border-color: #334155;
+    }
+
+    .form-card {
+        background: rgba(30, 41, 59, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+        background: rgba(51, 65, 85, 0.5);
+        border-color: var(--border-color);
+        color: var(--text-primary);
+    }
+
+    input::placeholder {
+        color: var(--text-secondary);
+    }
+}
+
+/* Animation de chargement (optionnel pour le bouton) */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

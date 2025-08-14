@@ -1,0 +1,247 @@
+.student-management-container {
+  font-family: 'Segoe UI', sans-serif;
+  color: #333;
+  padding: 2rem;
+  background: #f4f6f8;
+}
+
+/* Blocs principaux */
+.student-import,
+.student-form,
+.filters,
+.student-list {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  transition: box-shadow 0.3s ease;
+}
+.student-import:hover,
+.student-form:hover,
+.filters:hover,
+.student-list:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Titres de section */
+.student-import h3,
+.filters h3,
+.student-form h2,
+.student-list h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: #0d6efd;
+}
+
+/* Contrôles d'import */
+.import-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.import-controls button {
+  background-color: #0d6efd;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.3s ease;
+}
+.import-controls button:hover {
+  background-color: #0b5ed7;
+}
+.import-controls button i {
+  margin-right: 0.5rem;
+}
+
+/* Grid des formulaires */
+.student-grid,
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+/* Groupes de champs */
+.form-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: #444;
+}
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border 0.3s ease;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #0d6efd;
+  outline: none;
+}
+
+/* Icones dans input */
+.input-icon {
+  position: relative;
+}
+.input-icon input {
+  padding-left: 2.5rem;
+}
+.input-icon i {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+/* Actions formulaire */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+.form-actions button {
+  border: none;
+  padding: 0.6rem 1.1rem;
+  font-weight: 500;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.form-actions button i {
+  margin-right: 0.5rem;
+}
+.form-actions button:hover {
+  transform: scale(1.03);
+}
+
+button.success {
+  background: #198754;
+  color: white;
+}
+button.warning {
+  background: #ffc107;
+  color: black;
+}
+button.outline {
+  background: transparent;
+  border: 1px solid #ccc;
+  color: #333;
+}
+
+/* Liste des étudiants */
+.student-list .list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.student-list .badge {
+  background-color: #0d6efd;
+  color: white;
+  padding: 0.4rem 0.9rem;
+  border-radius: 50px;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+/* Tableau */
+.table-container {
+  overflow-x: auto;
+  margin-top: 1.25rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+thead {
+  background-color: #f1f3f5;
+}
+th, td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+th {
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.3s ease;
+}
+th:hover {
+  background-color: #e0f0ff;
+}
+
+/* Photos */
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.photos img {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Boutons action */
+button.info {
+  background: #0dcaf0;
+  border: none;
+  color: white;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  margin-right: 0.3rem;
+}
+button.info:hover {
+  background: #0bbbe0;
+}
+button.danger {
+  background: #dc3545;
+  border: none;
+  color: white;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+}
+button.danger:hover {
+  background: #c82333;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 2rem 0;
+  color: #666;
+}
+.empty-state i {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+/* Exemple si ta sidebar a une largeur fixe, genre 250px */
+.main-content {
+  margin-left: 150px;
+  margin-right: 100px; /* adapte à la largeur de ta sidebar */
+  padding: 20px;
+}
