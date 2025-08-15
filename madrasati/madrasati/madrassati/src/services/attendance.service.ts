@@ -1,13 +1,14 @@
-import { HttpClient } from '@angular/common/http';
+// attendance.service.ts
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface AttendanceRecord {
   _id: string;
   studentId: string;
   classId: any;
-  scheduleId: any;
-  timestamp: Date;
+  timestamp: string;
 }
 
 export interface AttendanceSummary {
@@ -15,26 +16,16 @@ export interface AttendanceSummary {
   fullName: string;
   nomPere: string;
   isPresent: boolean;
-  timestamp: Date | null;
+  timestamp: string | null;
   attendanceId: string | null;
 }
 
 export interface ClassAttendanceResponse {
-  classInfo: any;
-  scheduleInfo: any;
+  classInfo: any | null;
   attendanceSummary: AttendanceSummary[];
   totalStudents: number;
   presentStudents: number;
   absentStudents: number;
-}
-
-export interface AttendanceStats {
-  totalStudents: number;
-  attendanceByDate: any;
-  overallStats: {
-    totalDays: number;
-    averageAttendance: number;
-  };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -43,42 +34,64 @@ export class AttendanceService {
 
   constructor(private http: HttpClient) {}
 
-  // Get all attendance records
-  getAllAttendance(): Observable<AttendanceRecord[]> {
-    return this.http.get<AttendanceRecord[]>(this.apiUrl);
+  /**
+   * Récupération du résumé de présence pour une classe (et optionnellement pour une date précise).
+   * Renvoie toujours un ClassAttendanceResponse (pas undefined).
+   */
+  getAttendanceByClass(classId: string, date?: string): Observable<ClassAttendanceResponse> {
+    let params = new HttpParams();
+    if (date) params = params.set('date', date);
+
+    return this.http
+      .get<ClassAttendanceResponse>(`${this.apiUrl}/class/${classId}`, { params })
+      .pipe(
+        map(res => res ?? {
+          classInfo: null,
+          attendanceSummary: [],
+          totalStudents: 0,
+          presentStudents: 0,
+          absentStudents: 0
+        })
+      );
   }
 
-  // Get attendance records by class ID
-  getAttendanceByClass(classId: string, date?: string, scheduleId?: string): Observable<ClassAttendanceResponse> {
-    let params: any = {};
-    if (date) params.date = date;
-    if (scheduleId) params.scheduleId = scheduleId;
-    
-    return this.http.get<ClassAttendanceResponse>(`${this.apiUrl}/class/${classId}`, { params });
+  /**
+   * Récupérer les présences d'un étudiant sur une période (retourne toujours un tableau, potentiellement vide).
+   */
+  getAttendanceByStudent(matricule: string, startDate?: string, endDate?: string, classId?: string): Observable<AttendanceRecord[]> {
+    let params = new HttpParams();
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    if (classId) params = params.set('classId', classId);
+
+    return this.http
+      .get<AttendanceRecord[]>(`${this.apiUrl}/student/${matricule}`, { params })
+      .pipe(map(res => res ?? []));
   }
 
-  // Get attendance records by date range
-  getAttendanceByDateRange(params: { classId: string, scheduleId: string, startDate: string, endDate: string }): Observable<AttendanceRecord[]> {
-    return this.http.get<AttendanceRecord[]>(this.apiUrl, { params });
+  /**
+   * Création d'un enregistrement de présence.
+   */
+  createAttendance(data: { studentId: string; classId: string }) {
+    return this.http.post<AttendanceRecord>(`${this.apiUrl}`, data);
   }
 
-  // Get attendance statistics for a class
-  getAttendanceStats(classId: string, startDate?: string, endDate?: string): Observable<AttendanceStats> {
-    let params: any = {};
-    if (startDate) params.startDate = startDate;
-    if (endDate) params.endDate = endDate;
-    
-    return this.http.get<AttendanceStats>(`${this.apiUrl}/stats/${classId}`, { params });
+  /**
+   * Suppression d'un enregistrement (retour flexible selon ton API).
+   */
+  deleteAttendance(id: string) {
+    return this.http.delete<{ message?: string }>(`${this.apiUrl}/${id}`);
   }
 
-  // Create new attendance record
-  createAttendance(data: { studentId: string; classId: string; scheduleId: string }): Observable<AttendanceRecord> {
-    return this.http.post<AttendanceRecord>(this.apiUrl, data);
-  }
+  /**
+   * Helper: récupérer les présences sur une plage de dates (toujours tableau).
+   */
+  getAttendanceByDateRange(startDate: string, endDate: string, classId?: string): Observable<AttendanceRecord[]> {
+    let params = new HttpParams().set('startDate', startDate).set('endDate', endDate);
+    if (classId) params = params.set('classId', classId);
 
-  // Delete attendance record
-  deleteAttendance(id: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`);
+    return this.http
+      .get<AttendanceRecord[]>(`${this.apiUrl}/date-range`, { params })
+      .pipe(map(res => res ?? []));
   }
 }
-

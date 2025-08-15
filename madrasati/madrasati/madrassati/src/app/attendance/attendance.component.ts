@@ -1,22 +1,13 @@
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { AttendanceService } from '../../services/attendance.service';
 import { ClassroomService } from '../../services/classroom.service';
-import { ScheduleService } from '../../services/schedule.service';
 import { StudentService } from '../../services/student.service';
 
 interface Classroom {
   _id: string;
   name: string;
   grade: string;
-}
-
-interface Schedule {
-  _id: string;
-  subject: string;
-  day: string;
-  startTime: string;
-  endTime: string;
-  classId: string;
 }
 
 interface Student {
@@ -27,72 +18,56 @@ interface Student {
   classId?: string | { _id: string; name?: string; grade?: string };
 }
 
-interface AttendanceRecord {
+interface AttendanceSummary {
   studentId: string;
-  classId: string;
-  scheduleId: string;
-  timestamp: string;
-}
-
-interface AttendanceMatrix {
-  [studentMatricule: string]: {
-    [date: string]: {
-      present: boolean;
-      timestamp?: string;
-    }
-  }
+  fullName: string;
+  nomPere: string;
+  isPresent: boolean;
+  timestamp: string | null;
+  attendanceId: string | null;
 }
 
 @Component({
   selector: 'app-attendance',
   templateUrl: './attendance.component.html',
   styleUrls: ['./attendance.component.css'],
-  encapsulation:ViewEncapsulation.None
+  encapsulation: ViewEncapsulation.None
 })
 export class AttendanceComponent implements OnInit {
-  // Data properties
-  classrooms: any[] = [];
-  classSchedules: any[] = [];
-  students: any[] = [];
-  attendanceData: any[] = [];
-  attendanceMatrix: AttendanceMatrix = {};
-  
-  // Filter properties
+  // exposer Math au template pour éviter l'erreur "Property 'Math' does not exist..."
+  Math = Math;
+
+  // données
+  classrooms: Classroom[] = [];
+  students: Student[] = [];
+  attendanceSummary: AttendanceSummary[] = [];
+
+  // filtres / dates
   selectedClassId: string = '';
-  selectedSubjectId: string = '';
+  selectedDate: string = ''; // pour voir qui est présent ce jour-là
   startDate: string = '';
   endDate: string = '';
+
+  // UI / recherche / pagination
   searchTerm: string = '';
-  
-  // Display properties
-  lessonDates: string[] = [];
-  filteredStudents: any[] = [];
-  
-  // Statistics
-  totalStudents: number = 0;
-  averagePresent: number = 0;
-  averageAbsent: number = 0;
-  attendanceRate: number = 0;
-  
-  // Pagination
+  filteredStudents: Student[] = [];
   currentPage: number = 1;
   itemsPerPage: number = 20;
   totalPages: number = 0;
-  
-  // State
-  isLoading: boolean = false;
-  Math = Math;
+
+  // état
+  loading: boolean = false;
+  expandedStudentMatricule: string | null = null;
+  studentRecords: { [matricule: string]: any[] } = {}; // cache des enregistrements par étudiant
 
   constructor(
     private attendanceService: AttendanceService,
     private classroomService: ClassroomService,
-    private scheduleService: ScheduleService,
     private studentService: StudentService
   ) {
-    // Set default date range (last 30 days)
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-    
+    this.selectedDate = today.toISOString().split('T')[0];
     this.endDate = today.toISOString().split('T')[0];
     this.startDate = thirtyDaysAgo.toISOString().split('T')[0];
   }
@@ -101,288 +76,212 @@ export class AttendanceComponent implements OnInit {
     this.loadClassrooms();
   }
 
+  // load classrooms (safe typing + fallback)
   async loadClassrooms(): Promise<void> {
     try {
-      const classrooms = await this.classroomService.getClassrooms().toPromise();
-      this.classrooms = classrooms || [];
+      const res: Classroom[] | undefined = await firstValueFrom(this.classroomService.getClassrooms());
+      this.classrooms = res ?? []; // fallback to empty array
     } catch (error) {
-      console.error('Error loading classrooms:', error);
+      console.error('Erreur chargement classes:', error);
+      this.classrooms = [];
     }
   }
 
+  // quand on change la classe : charger les étudiants et le résumé de présence pour selectedDate
   async onClassChange(): Promise<void> {
-    this.selectedSubjectId = '';
-    this.classSchedules = [];
+    this.attendanceSummary = [];
     this.students = [];
-    this.attendanceData = [];
-    this.lessonDates = [];
     this.filteredStudents = [];
-    
-    if (this.selectedClassId) {
-      await this.loadClassSchedules();
-      await this.loadStudents();
-    }
-  }
+    this.currentPage = 1;
+    this.studentRecords = {};
+    this.expandedStudentMatricule = null;
 
-  async loadClassSchedules(): Promise<void> {
-    try {
-      const schedules = await this.scheduleService.getSchedulesByClass(this.selectedClassId).toPromise();
-      this.classSchedules = schedules || [];
-    } catch (error) {
-      console.error('Error loading schedules:', error);
-    }
-  }
+    if (!this.selectedClassId) return;
 
-  async loadStudents(): Promise<void> {
     try {
-      const allStudents = await this.studentService.getAllStudents().toPromise();
-     this.students = (allStudents || []).filter((student: Student) => {
-        const studentClassId = typeof student.classId === 'string' ? student.classId : student.classId?._id;
-        console.log('Comparing student classId:', studentClassId, 'with selectedClassId:', this.selectedClassId);
-        return studentClassId === this.selectedClassId;
-      });      this.totalStudents = this.students.length;
+      const allStudents: any[] = (await firstValueFrom(this.studentService.getAllStudents())) ?? [];
+      this.students = (allStudents || []).filter(s => {
+        const cid = typeof s.classId === 'string' ? s.classId : s.classId?._id;
+        return cid === this.selectedClassId;
+      });
+
       this.filteredStudents = [...this.students];
-      console.log(allStudents);
-      console.log(this.students);
+      this.updatePagination();
+      await this.loadClassPresenceForDate();
     } catch (error) {
-      console.error('Error loading students:', error);
+      console.error('Erreur chargement étudiants:', error);
+      this.students = [];
+      this.filteredStudents = [];
+      this.updatePagination();
     }
   }
 
-  onSubjectChange(): void {
-    this.attendanceData = [];
-    this.lessonDates = [];
-    this.attendanceMatrix = {};
-  }
-
-  onDateRangeChange(): void {
-    if (this.selectedClassId && this.selectedSubjectId) {
-      this.generateLessonDates();
-    }
-  }
-
-  generateLessonDates(): void {
-    if (!this.selectedSubjectId || !this.startDate || !this.endDate) {
-      return;
-    }
-
-    const selectedSchedule = this.classSchedules.find(s => s._id === this.selectedSubjectId);
-    if (!selectedSchedule) {
-      console.log("houni lmochkla");
-      return;
-    }
-    console.log(selectedSchedule);
-    const dates: string[] = [];
-    const start = new Date(this.startDate);
-    const end = new Date(this.endDate);
-    
-    // Map day names to numbers (0 = Sunday, 1 = Monday, etc.)
-    const dayMap: { [key: string]: number } = {
-      'Dimanche': 0, 'Lundi': 1, 'Mardi': 2, 'Mercredi': 3,
-      'Jeudi': 4, 'Vendredi': 5, 'Samedi': 6
-    };
-    
-    const targetDay = dayMap[selectedSchedule.day];
-    if (targetDay === undefined) {
-      return;
-    }
-
-    // Find all dates that match the schedule day
-    const current = new Date(start);
-    while (current <= end) {
-      if (current.getDay() === targetDay) {
-        dates.push(current.toISOString().split('T')[0]);
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    this.lessonDates = dates;
-  }
-
-  async loadAttendanceData(): Promise<void> {
-    if (!this.selectedClassId || !this.selectedSubjectId) {
-      return;
-    }
-
-    this.isLoading = true;
-    this.generateLessonDates();
-
+  // charger le résumé présent/absent pour la classe sur selectedDate
+  async loadClassPresenceForDate(): Promise<void> {
+    if (!this.selectedClassId || !this.selectedDate) return;
+    this.loading = true;
     try {
-      // Load attendance data for the date range
-      const params = {
-        classId: this.selectedClassId,
-        scheduleId: this.selectedSubjectId,
-        startDate: this.startDate,
-        endDate: this.endDate
-      };
-
-      const attendanceData = await this.attendanceService.getAttendanceByDateRange(params).toPromise();
-      this.attendanceData = attendanceData || [];
-      console.log(this.attendanceData);
-      this.buildAttendanceMatrix();
-      this.calculateStatistics();
+      const res: any = await firstValueFrom(this.attendanceService.getAttendanceByClass(this.selectedClassId, this.selectedDate));
+      this.attendanceSummary = (res?.attendanceSummary as AttendanceSummary[]) ?? [];
+      // s'assurer que filteredStudents est cohérent
       this.filterStudents();
     } catch (error) {
-      console.error('Error loading attendance data:', error);
+      console.error('Erreur chargement présence classe:', error);
+      this.attendanceSummary = [];
     } finally {
-      this.isLoading = false;
+      this.loading = false;
     }
   }
 
-buildAttendanceMatrix(): void {
-    this.attendanceMatrix = {};
+  // bouton pour afficher l'historique d'un étudiant entre startDate et endDate
+  async viewStudentAttendance(student: { studentId?: string; matricule?: string; fullName?: string }) {
+    const mat = student.studentId || student.matricule;
+    if (!mat) return;
 
-    // Initialize matrix for all students and dates
-    this.students.forEach(student => {
-      this.attendanceMatrix[student.matricule] = {};
-      this.lessonDates.forEach(date => {
-        this.attendanceMatrix[student.matricule][date] = { present: false };
-      });
-    });
-
-    // Fill matrix with actual attendance data
-    this.attendanceData.forEach(record => {
-      const student = this.students.find(s => s.matricule === record.studentId);
-      if (student) {
-        const date = new Date(record.timestamp).toISOString().split('T')[0];
-        if (this.attendanceMatrix[student.matricule] && this.attendanceMatrix[student.matricule][date]) {
-          this.attendanceMatrix[student.matricule][date] = {
-            present: true,
-            timestamp: record.timestamp
-          };
-        }
-      }
-    });
-
-    console.log('Attendance matrix:', this.attendanceMatrix);
-  }
-
-  calculateStatistics(): void {
-    if (this.lessonDates.length === 0 || this.students.length === 0) {
-      this.averagePresent = 0;
-      this.averageAbsent = 0;
-      this.attendanceRate = 0;
+    // toggle expansion
+    if (this.expandedStudentMatricule === mat) {
+      this.expandedStudentMatricule = null;
       return;
     }
+    this.expandedStudentMatricule = mat;
 
-    let totalPresent = 0;
-    let totalPossible = this.students.length * this.lessonDates.length;
+    // si déjà en cache, pas besoin de rappeler
+    if (this.studentRecords[mat]) return;
 
-    this.students.forEach(student => {
-      this.lessonDates.forEach(date => {
-        if (this.attendanceMatrix[student.matricule] && 
-            this.attendanceMatrix[student.matricule][date] && 
-            this.attendanceMatrix[student.matricule][date].present) {
-          totalPresent++;
-        }
-      });
-    });
-
-    this.averagePresent = Math.round(totalPresent / this.students.length);
-    this.averageAbsent = Math.round((this.students.length * this.lessonDates.length - totalPresent) / this.students.length);
-    this.attendanceRate = Math.round((totalPresent / totalPossible) * 100);
+    try {
+      const records: any[] = (await firstValueFrom(this.attendanceService.getAttendanceByStudent(mat, this.startDate, this.endDate, this.selectedClassId))) ?? [];
+      this.studentRecords[mat] = records;
+    } catch (error) {
+      console.error('Erreur chargement enregistrements étudiant:', error);
+      this.studentRecords[mat] = [];
+    }
   }
 
-  filterStudents(): void {
-    let filtered = [...this.students];
+  // utilitaires affichage
+  isPresent(matricule: string): boolean {
+    return !!this.attendanceSummary.find(a => a.studentId === matricule && a.isPresent);
+  }
+formatTime(ts: string | null): string {
+  if (!ts) return '';
+  
+  try {
+    const date = new Date(ts);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return ts ?? '';
+    }
+    
+    // Format date as DD/MM and time as HH:mm
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month} ${hours}:${minutes}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return ts ?? '';
+  }
+}
 
+// Alternative method if you want to include the year
+formatTimeWithYear(ts: string | null): string {
+  if (!ts) return '';
+  
+  try {
+    const date = new Date(ts);
+    
+    if (isNaN(date.getTime())) {
+      return ts ?? '';
+    }
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    return ts ?? '';
+  }
+}
+
+  // recherche + pagination
+  filterStudents(): void {
+    let list = [...this.students];
     if (this.searchTerm) {
-      const term = this.searchTerm.toLowerCase();
-      filtered = filtered.filter(student =>
-        student.fullName.toLowerCase().includes(term) ||
-        student.matricule.toLowerCase().includes(term) ||
-        student.nomPere.toLowerCase().includes(term)
+      const term = this.searchTerm.trim().toLowerCase();
+      list = list.filter(s =>
+        (s.fullName || '').toLowerCase().includes(term) ||
+        (s.matricule || '').toLowerCase().includes(term) ||
+        (s.nomPere || '').toLowerCase().includes(term)
       );
     }
 
-    this.filteredStudents = filtered;
-    this.totalPages = Math.ceil(this.filteredStudents.length / this.itemsPerPage);
+    this.filteredStudents = list;
     this.currentPage = 1;
+    this.updatePagination();
   }
 
-  isPresent(matricule: string, date: string): boolean {
-    return this.attendanceMatrix[matricule] && 
-           this.attendanceMatrix[matricule][date] && 
-           this.attendanceMatrix[matricule][date].present;
+  updatePagination(): void {
+    this.totalPages = Math.max(1, Math.ceil(this.filteredStudents.length / this.itemsPerPage));
   }
 
-  getAttendanceStatus(matricule: string, date: string): string {
-    return this.isPresent(matricule, date) ? 'present' : 'absent';
+  // obtenir les étudiants à afficher sur la page courante
+  get pagedStudents(): Student[] {
+    const start = (this.currentPage - 1) * this.itemsPerPage;
+    return this.filteredStudents.slice(start, start + this.itemsPerPage);
   }
 
-  getAttendanceTooltip(matricule: string, date: string): string {
-    if (this.isPresent(matricule, date)) {
-      const timestamp = this.attendanceMatrix[matricule][date].timestamp;
-      if (timestamp) {
-        const time = new Date(timestamp).toLocaleTimeString('fr-FR', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        });
-        return `Présent à ${time}`;
-      }
-      return 'Présent';
-    }
-    return 'Absent';
-  }
-
-  formatDateDay(date: string): string {
-    const d = new Date(date);
-    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    return days[d.getDay()];
-  }
-
-  formatDateFull(date: string): string {
-    const d = new Date(date);
-    return d.toLocaleDateString('fr-FR', { 
-      day: '2-digit', 
-      month: '2-digit' 
-    });
-  }
-
-  trackByStudentId(index: number, student: any): string {
-    return student._id;
-  }
-
-  // Pagination methods
   previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+    if (this.currentPage > 1) this.currentPage--;
   }
 
   nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-    }
+    if (this.currentPage < this.totalPages) this.currentPage++;
   }
 
+  // export CSV simple (matricule, nom, nomPere, présent le selectedDate (Oui/Non), count présences dans la période)
   exportToCSV(): void {
-    if (this.filteredStudents.length === 0 || this.lessonDates.length === 0) {
-      return;
-    }
+    if (!this.selectedClassId) return;
+    const headers = ['Matricule', 'Nom Complet', 'Nom du Père', `Présent le ${this.selectedDate}`, `Présences (${this.startDate} → ${this.endDate})`];
+    const rows: string[] = [headers.join(',')];
 
-    const headers = ['Matricule', 'Nom Complet', 'Nom du Père', ...this.lessonDates.map(date => this.formatDateFull(date))];
-    const csvContent = [headers.join(',')];
+    const buildCount = (mat: string) => {
+      const arr = this.studentRecords[mat] || [];
+      return arr.length.toString();
+    };
 
-    this.filteredStudents.forEach(student => {
+    this.filteredStudents.forEach(s => {
+      const present = this.isPresent(s.matricule) ? 'Oui' : 'Non';
+      const count = buildCount(s.matricule);
       const row = [
-        student.matricule,
-        `"${student.fullName}"`,
-        `"${student.nomPere}"`,
-        ...this.lessonDates.map(date => this.isPresent(student.matricule, date) ? 'Présent' : 'Absent')
+        `"${s.matricule}"`,
+        `"${s.fullName}"`,
+        `"${s.nomPere}"`,
+        present,
+        count
       ];
-      csvContent.push(row.join(','));
+      rows.push(row.join(','));
     });
 
-    const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `presences_${this.selectedClassId}_${this.selectedSubjectId}_${new Date().toISOString().split('T')[0]}.csv`);
+    const fileName = `presences_${this.selectedClassId}_${this.selectedDate}.csv`;
+    link.setAttribute('download', fileName);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  trackByStudent(index: number, student: Student) {
+    return student._id || student.matricule;
   }
 }
-

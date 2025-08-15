@@ -4,15 +4,15 @@ const cors = require("cors");
 const { WebSocketServer } = require("ws");
 const winston = require("winston");
 const teacherRoutes = require("./routes/teacherRoutes");
-const authRoutes = require("./routes/authRoutes"); // ✅ Importing auth routes
+const authRoutes = require("./routes/authRoutes");
 const classRoutes = require("./routes/classroom");
 const studentRoutes = require("./routes/student");
 const scheduleRoutes = require("./routes/schedules");
 const attendanceRoutes = require("./routes/attendance");
 const faceEncodingRoutes = require("./routes/face-encoding");
 const Attendance = require("./models/Attendance");
-const ClassSchedule = require("./models/ClassSchedule");
 const Student = require("./models/Student");
+const Classroom = require("./models/Classroom"); // Ensure Classroom is imported
 
 // Configure Winston logger
 const logger = winston.createLogger({
@@ -35,14 +35,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-// Routes
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/classrooms", classRoutes);
 app.use("/api/students", studentRoutes);
-app.use("/api/schedules", scheduleRoutes);
+app.use("/api/schedules", scheduleRoutes); // Kept for compatibility, but not used in WebSocket
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/face-encoding", faceEncodingRoutes);
-app.use("/api/auth", authRoutes); // ✅ Correctly mounted auth routes
+app.use("/api/auth", authRoutes);
+
 // MongoDB Connection
 mongoose
   .connect("mongodb://localhost:27017/madrasati", {
@@ -76,7 +76,7 @@ wss.on("connection", (ws, req) => {
 
       // Validate inputs
       if (!studentId || !timestamp) {
-        logger.error("Missing studentId or timestamp", {
+        logger.warn("Missing studentId or timestamp", {
           studentId,
           timestamp,
           clientIp,
@@ -90,7 +90,7 @@ wss.on("connection", (ws, req) => {
       // Validate studentId against matricule in Student collection
       const student = await Student.findOne({ matricule: studentId });
       if (!student) {
-        logger.error("Student not found", { matricule: studentId, clientIp });
+        logger.warn("Student not found", { matricule: studentId, clientIp });
         ws.send(
           JSON.stringify({
             error: `Student with matricule ${studentId} not found`,
@@ -99,10 +99,30 @@ wss.on("connection", (ws, req) => {
         return;
       }
 
+      // Get classId from student
+      const classId = student.classId;
+      logger.debug("Retrieved classId from student", {
+        studentId,
+        classId: classId.toString(),
+        clientIp,
+      });
+
+      // Validate classId
+      const classroom = await Classroom.findById(classId);
+      if (!classroom) {
+        logger.warn("Classroom not found", { classId, clientIp });
+        ws.send(
+          JSON.stringify({
+            error: `Classroom with ID ${classId} not found`,
+          })
+        );
+        return;
+      }
+
       // Validate timestamp format (YYYY-MM-DD HH:MM)
       const timestampRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
       if (!timestampRegex.test(timestamp)) {
-        logger.error("Invalid timestamp format", { timestamp, clientIp });
+        logger.warn("Invalid timestamp format", { timestamp, clientIp });
         ws.send(
           JSON.stringify({
             error: "Invalid timestamp format. Use YYYY-MM-DD HH:MM",
@@ -114,67 +134,34 @@ wss.on("connection", (ws, req) => {
       // Parse timestamp
       const date = new Date(timestamp.replace(" ", "T") + ":00Z");
       if (isNaN(date.getTime())) {
-        logger.error("Invalid timestamp value", { timestamp, clientIp });
+        logger.warn("Invalid timestamp value", { timestamp, clientIp });
         ws.send(JSON.stringify({ error: "Invalid timestamp value" }));
         return;
       }
 
-      // Get day of week and time from timestamp
-      const dayOfWeek = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-      ][date.getDay()];
-      const currentTime = `${date.getHours().toString().padStart(2, "0")}:${date
-        .getMinutes()
-        .toString()
-        .padStart(2, "0")}`;
-
-      // Find active schedule
-      const schedule = await ClassSchedule.findOne({
-        dayOfWeek,
-        startTime: { $lte: currentTime },
-        endTime: { $gte: currentTime },
-      }).populate("classId");
-
-      if (!schedule) {
-        logger.error("No active schedule found", {
-          dayOfWeek,
-          currentTime,
-          timestamp,
-          clientIp,
-        });
-        ws.send(
-          JSON.stringify({
-            error: "No active class schedule found for the given timestamp",
-          })
-        );
-        return;
-      }
-
       // Check for duplicate attendance
+      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+
       const existingAttendance = await Attendance.findOne({
         studentId,
-        scheduleId: schedule._id,
+        classId,
         timestamp: {
-          $gte: new Date(date.setHours(0, 0, 0, 0)),
-          $lte: new Date(date.setHours(23, 59, 59, 999)),
+          $gte: startOfDay,
+          $lte: endOfDay,
         },
       });
       if (existingAttendance) {
         logger.warn("Duplicate attendance detected", {
           studentId,
-          scheduleId: schedule._id.toString(),
+          classId: classId.toString(),
           timestamp,
+          existingAttendanceId: existingAttendance._id,
           clientIp,
         });
         ws.send(
           JSON.stringify({
-            error: `Attendance already recorded for student ${studentId} on this day`,
+            error: `Attendance already recorded for student ${studentId} in class ${classId} on this day`,
           })
         );
         return;
@@ -182,16 +169,14 @@ wss.on("connection", (ws, req) => {
 
       // Save attendance
       const attendance = new Attendance({
-        studentId, // Maps to matricule
-        classId: schedule.classId._id,
-        scheduleId: schedule._id,
+        studentId, // Store matricule as string
+        classId,
         timestamp: date,
       });
       await attendance.save();
       logger.info("Attendance recorded", {
         studentId,
-        classId: schedule.classId._id.toString(),
-        scheduleId: schedule._id.toString(),
+        classId: classId.toString(),
         timestamp,
         clientIp,
       });
@@ -199,6 +184,9 @@ wss.on("connection", (ws, req) => {
       ws.send(
         JSON.stringify({
           message: `Attendance recorded for student ${studentId}`,
+          studentName: student.fullName,
+          className: classroom.name,
+          timestamp,
         })
       );
     } catch (err) {
@@ -207,12 +195,22 @@ wss.on("connection", (ws, req) => {
         stack: err.stack,
         clientIp,
       });
-      ws.send(JSON.stringify({ error: err.message }));
+      ws.send(
+        JSON.stringify({ error: "Internal server error", details: err.message })
+      );
     }
   });
 
   ws.on("close", () => {
     logger.info("WebSocket client disconnected", { clientIp });
+  });
+
+  ws.on("error", (error) => {
+    logger.error("WebSocket client error", {
+      error: error.message,
+      stack: error.stack,
+      clientIp,
+    });
   });
 });
 

@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const attendanceSchema = new mongoose.Schema({
   studentId: {
-    type: String, // Matches studentId from FastAPI
+    type: String, // identifiant/ matricule venant du FastAPI / Student
     required: true,
   },
   classId: {
@@ -10,11 +10,7 @@ const attendanceSchema = new mongoose.Schema({
     ref: "Classroom",
     required: true,
   },
-  scheduleId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "ClassSchedule",
-    required: true,
-  },
+  // scheduleId supprimé selon ta nouvelle logique
   timestamp: {
     type: Date,
     default: Date.now,
