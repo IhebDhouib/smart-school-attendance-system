@@ -132,7 +132,7 @@ wss.on("connection", (ws, req) => {
       }
 
       // Parse timestamp
-      const date = new Date(timestamp.replace(" ", "T") + ":00Z");
+      const date = new Date(timestamp.replace(" ", "T") + ":00");
       if (isNaN(date.getTime())) {
         logger.warn("Invalid timestamp value", { timestamp, clientIp });
         ws.send(JSON.stringify({ error: "Invalid timestamp value" }));
@@ -140,32 +140,9 @@ wss.on("connection", (ws, req) => {
       }
 
       // Check for duplicate attendance
-      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
 
-      const existingAttendance = await Attendance.findOne({
-        studentId,
-        classId,
-        timestamp: {
-          $gte: startOfDay,
-          $lte: endOfDay,
-        },
-      });
-      if (existingAttendance) {
-        logger.warn("Duplicate attendance detected", {
-          studentId,
-          classId: classId.toString(),
-          timestamp,
-          existingAttendanceId: existingAttendance._id,
-          clientIp,
-        });
-        ws.send(
-          JSON.stringify({
-            error: `Attendance already recorded for student ${studentId} in class ${classId} on this day`,
-          })
-        );
-        return;
-      }
+
+
 
       // Save attendance
       const attendance = new Attendance({

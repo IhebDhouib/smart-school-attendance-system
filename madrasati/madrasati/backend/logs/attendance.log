@@ -73,3 +73,44 @@
 {"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"11139332","timestamp":"2025-08-15T15:23:59.265Z"}
 {"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","level":"info","message":"Attendance recorded","studentId":"11139332","timestamp":"2025-08-15 16:23"}
 {"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T15:24:03.303Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-08-15T16:48:02.246Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-15T16:48:02.263Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T16:54:23.156Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"11139332","timestamp":"2025-08-15 17:54"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"11139332","timestamp":"2025-08-15T16:54:32.842Z"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","existingAttendanceId":"689f510faff6980d55ad7c6a","level":"warn","message":"Duplicate attendance detected","studentId":"11139332","timestamp":"2025-08-15 17:54"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"11139332","timestamp":"2025-08-15 17:55"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"11139332","timestamp":"2025-08-15T16:55:04.052Z"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","existingAttendanceId":"689f510faff6980d55ad7c6a","level":"warn","message":"Duplicate attendance detected","studentId":"11139332","timestamp":"2025-08-15 17:55"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T16:55:17.861Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T16:59:45.654Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"11139332","timestamp":"2025-08-15 17:59"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"11139332","timestamp":"2025-08-15T16:59:56.604Z"}
+{"classId":"6895c078b2e1514f6a0c41a9","clientIp":"::1","existingAttendanceId":"689f510faff6980d55ad7c6a","level":"warn","message":"Duplicate attendance detected","studentId":"11139332","timestamp":"2025-08-15 17:59"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T17:00:14.874Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T17:03:16.530Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"12345","timestamp":"2025-08-15 18:03"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-15T17:03:18.869Z"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"info","message":"Attendance recorded","studentId":"12345","timestamp":"2025-08-15 18:03"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"12345","timestamp":"2025-08-15 18:03"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-15T17:03:51.699Z"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","existingAttendanceId":"689f685695ea5152dd5bca01","level":"warn","message":"Duplicate attendance detected","studentId":"12345","timestamp":"2025-08-15 18:03"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T17:04:38.405Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-08-15T17:54:57.063Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-15T17:54:57.091Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T17:55:33.301Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"12345","timestamp":"2025-08-15 18:55"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-15T17:55:37.945Z"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"info","message":"Attendance recorded","studentId":"12345","timestamp":"2025-08-15 18:55"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T17:56:05.258Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-08-15T18:05:26.383Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-15T18:05:26.407Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T18:05:56.254Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"12345","timestamp":"2025-08-15 19:05"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-15T18:05:57.346Z"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"info","message":"Attendance recorded","studentId":"12345","timestamp":"2025-08-15 19:05"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-15T18:06:12.574Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-08-15T18:08:02.999Z"}
+{"clientIp":"::1","level":"debug","message":"Received attendance data","studentId":"12345","timestamp":"2025-08-15 19:08"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-15T18:08:05.370Z"}
+{"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","existingAttendanceId":"689f77053a56d56b4380dd92","level":"warn","message":"Duplicate attendance detected","studentId":"12345","timestamp":"2025-08-15 19:08"}

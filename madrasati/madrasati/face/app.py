@@ -77,7 +77,7 @@ def send_attendance_data(student_matricule, timestamp):
         
         # Format timestamp as required by backend (YYYY-MM-DD HH:MM)
         formatted_timestamp = timestamp.strftime("%Y-%m-%d %H:%M")
-        
+        print(formatted_timestamp)
         data = {
             "studentId": student_matricule,
             "timestamp": formatted_timestamp
