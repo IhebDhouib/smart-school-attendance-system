@@ -67,11 +67,12 @@ wss.on("connection", (ws, req) => {
   ws.on("message", async (message) => {
     try {
       const data = JSON.parse(message.toString());
-      const { studentId, timestamp } = data;
+      const { studentId, timestamp, camera_type } = data;
       logger.debug("Received attendance data", {
         studentId,
         timestamp,
         clientIp,
+        camera_type,
       });
 
       // Validate inputs
@@ -149,6 +150,7 @@ wss.on("connection", (ws, req) => {
         studentId, // Store matricule as string
         classId,
         timestamp: date,
+        camera: camera_type,
       });
       await attendance.save();
       logger.info("Attendance recorded", {
@@ -156,6 +158,7 @@ wss.on("connection", (ws, req) => {
         classId: classId.toString(),
         timestamp,
         clientIp,
+        camera_type,
       });
 
       ws.send(

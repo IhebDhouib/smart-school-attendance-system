@@ -99,7 +99,8 @@
                     <h4>سجلات الحضور بين {{startDate}} و {{endDate}}</h4>
                     <ul>
                       <li *ngFor="let r of (studentRecords[s.matricule] || [])">
-                        <span class="record-time">{{ formatTime(r.timestamp) }}</span>
+                        <span class="record-time" [ngClass]="{'entry': r.camera === 'entry', 'exit': r.camera === 'exit'}">{{
+                          formatTime(r.timestamp) }}</span>
                         <span class="record-separator"> — </span>
                       </li>
                     </ul>

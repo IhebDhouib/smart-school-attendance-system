@@ -15,6 +15,7 @@ const attendanceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  camera: { type: String, required: true },
 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);

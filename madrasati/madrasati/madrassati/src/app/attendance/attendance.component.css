@@ -464,9 +464,16 @@
 
 /* Date and time styling in records - simplified */
 .record-time {
-  color: #667eea;
   font-weight: 600;
   font-size: 1rem;
+}
+
+.entry {
+  color: green;
+}
+
+.exit {
+  color: red;
 }
 
 /* ===== PAGINATION ===== */
