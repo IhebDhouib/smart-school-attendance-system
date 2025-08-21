@@ -1,0 +1,111 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: madrasati_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-madrasati123}
+      MONGO_INITDB_DATABASE: madrasati
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - madrasati_network
+
+  # Node.js Backend
+  backend:
+    build:
+      context: ../madrasati
+      dockerfile: ../docker-setup/Dockerfile.backend
+    container_name: madrasati_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      WEBSOCKET_PORT: 3001
+      MONGODB_URI: mongodb://admin:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati?authSource=admin
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+    volumes:
+      - backend_uploads:/app/uploads:Z
+      - backend_logs:/app/logs:Z
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    depends_on:
+      - mongodb
+    networks:
+      - madrasati_network
+
+  face-api:
+    build:
+      context: ../madrasati
+      dockerfile: ../docker-setup/Dockerfile.face-api
+    container_name: madrasati_face_api
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: 1
+
+    ports:
+      - "8000:8000"
+    networks:
+      - madrasati_network
+
+  # Python Face Detection Server
+  face-detection:
+    build:
+      context: ../../
+      dockerfile: madrasati/docker-setup/Dockerfile.face-detection
+    container_name: madrasati_face_detection
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: 1
+      BACKEND_URL: http://backend:3000
+      WEBSOCKET_URL: ws://backend:3001
+      ENTRY_CAMERA_1: ${ENTRY_CAMERA_1:-http://192.168.1.66:8080/video}
+      ENTRY_CAMERA_2: ${ENTRY_CAMERA_2:-1}
+      EXIT_CAMERA_1: ${EXIT_CAMERA_1:-0}
+      EXIT_CAMERA_2: ${EXIT_CAMERA_2:-http://192.168.1.68:5001/video}
+      EXIT_CAMERA_3: ${EXIT_CAMERA_3:-0}
+
+    depends_on:
+      - backend
+      - face-api
+    networks:
+      - madrasati_network
+    privileged: true
+    devices:
+      - /dev/video0:/dev/video0
+  # Angular Frontend
+  frontend:
+    build:
+      context: ../../ 
+      dockerfile: madrasati/docker-setup/Dockerfile.frontend
+    container_name: madrasati_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+    depends_on:
+      - backend
+    networks:
+      - madrasati_network
+
+volumes:
+  mongodb_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+
+
+networks:
+  madrasati_network:
+    driver: bridge

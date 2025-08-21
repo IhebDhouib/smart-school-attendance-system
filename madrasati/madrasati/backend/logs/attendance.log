@@ -444,3 +444,5 @@
 {"classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"debug","message":"Retrieved classId from student","studentId":"12345","timestamp":"2025-08-18T19:17:09.310Z"}
 {"camera_type":"entry","classId":"689df90aef0e930fbf45da1e","clientIp":"::1","level":"info","message":"Attendance recorded","studentId":"12345","timestamp":"2025-08-18 20:17"}
 {"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-18T19:18:46.301Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-08-19T00:24:12.847Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-19T00:24:12.881Z"}

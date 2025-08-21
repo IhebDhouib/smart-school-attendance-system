@@ -18,7 +18,7 @@ export class TeacherComponent implements OnInit {
   imagePreview: string | null = null;
   isEditing = false;
   errorMessage: string | null = null;
-  backendUrl = 'http://localhost:3000';
+  backendUrl = 'http://backend:3000';
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   constructor(private teacherService: TeacherService) {}

@@ -1,0 +1,47 @@
+# Python Face Detection Server Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies for OpenCV and face_recognition
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libopencv-dev \
+    python3-opencv \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY madrasati/madrasati/face/requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy face service files
+COPY madrasati/madrasati/face/ .
+
+# Copiez spécifiquement le fichier encodings.pkl s'il existe
+COPY madrasati/madrasati/face/encodings.pkl ./encodings.pkl
+
+# Create necessary directories
+RUN mkdir -p dataset unknown_faces logs
+
+# Set permissions
+RUN chmod +x *.py
+
+# Environment variables
+ENV ENTRY_CAMERA_1="http://192.168.1.66:8080/video"
+ENV ENTRY_CAMERA_2="1"
+ENV EXIT_CAMERA_1="0"
+ENV EXIT_CAMERA_2="http://192.168.1.68:5001/video"
+ENV EXIT_CAMERA_3="0"
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]

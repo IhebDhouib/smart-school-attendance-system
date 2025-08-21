@@ -30,7 +30,7 @@ export interface ClassAttendanceResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
-  private apiUrl = 'http://localhost:3000/api/attendance';
+  private apiUrl = 'http://backend:3000/api/attendance';
 
   constructor(private http: HttpClient) {}
 

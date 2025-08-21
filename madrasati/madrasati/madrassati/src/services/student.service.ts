@@ -23,7 +23,7 @@ export interface Student {
   providedIn: 'root',
 })
 export class StudentService {
-  private apiUrl = 'http://localhost:3000/api/students';
+  private apiUrl = 'http://backend:3000/api/students';
 
   constructor(private http: HttpClient) {}
 

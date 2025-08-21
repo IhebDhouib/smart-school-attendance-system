@@ -14,7 +14,7 @@ export interface Teacher {
   providedIn: 'root'
 })
 export class TeacherService {
-  private apiUrl = 'http://localhost:3000/api/teachers'; // Make sure this matches your backend path
+  private apiUrl = 'http://backend:3000/api/teachers'; // Make sure this matches your backend path
 
   constructor(private http: HttpClient) {}
 

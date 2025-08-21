@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
-  private apiUrl = 'http://localhost:3000/api/schedules';
+  private apiUrl = 'http://backend:3000/api/schedules';
 
   constructor(private http: HttpClient) {}
 

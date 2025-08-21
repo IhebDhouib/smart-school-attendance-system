@@ -45,7 +45,7 @@ app.use("/api/auth", authRoutes);
 
 // MongoDB Connection
 mongoose
-  .connect("mongodb://localhost:27017/madrasati", {
+  .connect("mongodb://mongodb:27017/madrasati", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })

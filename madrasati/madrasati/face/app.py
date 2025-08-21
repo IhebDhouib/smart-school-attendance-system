@@ -12,6 +12,7 @@ from utils_copy import load_config, validate_encodings
 import pickle
 import websocket
 
+
 # 📁 Chemins
 ENCODINGS_FILE = "encodings.pkl"
 UNKNOWN_DIR = "unknown_faces"
