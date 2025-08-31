@@ -32,20 +32,6 @@
       </div>
     </div>
 
-    <div class="stat-card teachers">
-      <div class="stat-icon">
-        <i class="fas fa-chalkboard-teacher"></i>
-      </div>
-      <div class="stat-content">
-        <h3>{{ totalTeachers }}</h3>
-        <p>إجمالي المعلمين</p>
-        <div class="stat-trend positive">
-          <i class="fas fa-arrow-up"></i>
-          <span>+2 معلم جديد</span>
-        </div>
-      </div>
-    </div>
-
     <div class="stat-card classes">
       <div class="stat-icon">
         <i class="fas fa-book"></i>
@@ -98,100 +84,6 @@
       </div>
       <div class="chart-content">
         <canvas #studentsChart></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recent Activities -->
-  <div class="activities-section">
-    <div class="section-header">
-      <h3>
-        <i class="fas fa-clock"></i>
-        الأنشطة الأخيرة
-      </h3>
-      <button class="view-all-btn" (click)="viewAllActivities()">
-        عرض الكل
-        <i class="fas fa-arrow-left"></i>
-      </button>
-    </div>
-    
-    <div class="activities-list">
-      <div class="activity-item" *ngFor="let activity of recentActivities">
-        <div class="activity-icon" [ngClass]="activity.type">
-          <i class="fas" [ngClass]="getActivityIcon(activity.type)"></i>
-        </div>
-        <div class="activity-content">
-          <h4>{{ activity.title }}</h4>
-          <p>{{ activity.description }}</p>
-          <span class="activity-time">{{ activity.timestamp | date:'short':'ar' }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quick Actions -->
-  <div class="quick-actions">
-    <div class="section-header">
-      <h3>
-        <i class="fas fa-bolt"></i>
-        إجراءات سريعة
-      </h3>
-    </div>
-    
-    <div class="actions-grid">
-      <button class="action-btn" (click)="navigateTo('/student')">
-        <i class="fas fa-user-plus"></i>
-        <span>إضافة طالب جديد</span>
-      </button>
-      
-      <button class="action-btn" (click)="navigateTo('/teacher')">
-        <i class="fas fa-user-tie"></i>
-        <span>إضافة معلم جديد</span>
-      </button>
-      
-      <button class="action-btn" (click)="navigateTo('/class')">
-        <i class="fas fa-plus-circle"></i>
-        <span>إنشاء فصل جديد</span>
-      </button>
-      
-      <button class="action-btn" (click)="navigateTo('/attendance')">
-        <i class="fas fa-clipboard-check"></i>
-        <span>تسجيل الحضور</span>
-      </button>
-      
-      <button class="action-btn" (click)="navigateTo('/schedule')">
-        <i class="fas fa-calendar-plus"></i>
-        <span>إضافة جدول</span>
-      </button>
-      
-      <button class="action-btn" (click)="generateReport()">
-        <i class="fas fa-file-alt"></i>
-        <span>إنشاء تقرير</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Alerts and Notifications -->
-  <div class="alerts-section" *ngIf="alerts.length > 0">
-    <div class="section-header">
-      <h3>
-        <i class="fas fa-exclamation-triangle"></i>
-        تنبيهات مهمة
-      </h3>
-    </div>
-    
-    <div class="alerts-list">
-      <div class="alert-item" *ngFor="let alert of alerts" [ngClass]="alert.type">
-        <div class="alert-icon">
-          <i class="fas" [ngClass]="getAlertIcon(alert.type)"></i>
-        </div>
-        <div class="alert-content">
-          <h4>{{ alert.title }}</h4>
-          <p>{{ alert.message }}</p>
-        </div>
-        <button class="alert-close" (click)="dismissAlert(alert.id)">
-          <i class="fas fa-times"></i>
-        </button>
       </div>
     </div>
   </div>

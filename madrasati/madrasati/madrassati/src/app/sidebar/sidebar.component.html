@@ -62,28 +62,6 @@
         </a>
       </li>
       <li class="nav-item" role="listitem">
-        <a routerLink="/teacher" 
-           class="nav-link" 
-           routerLinkActive="active"
-           data-tooltip="المعلمون"
-           (click)="onNavClick()"
-           role="menuitem">
-          <i class="fas fa-chalkboard-teacher" aria-hidden="true"></i>
-          <span>المعلمون</span>
-        </a>
-      </li>
-      <li class="nav-item" role="listitem">
-        <a routerLink="/schedule" 
-           class="nav-link" 
-           routerLinkActive="active"
-           data-tooltip="الجدول الزمني"
-           (click)="onNavClick()"
-           role="menuitem">
-          <i class="fas fa-calendar-week" aria-hidden="true"></i>
-          <span>الجدول الزمني</span>
-        </a>
-      </li>
-      <li class="nav-item" role="listitem">
         <a routerLink="/attendance" 
            class="nav-link" 
            routerLinkActive="active"
@@ -92,6 +70,39 @@
            role="menuitem">
           <i class="fas fa-check-circle" aria-hidden="true"></i>
           <span>الحضور</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/camera" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الكاميرات"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-video" aria-hidden="true"></i>
+          <span>الكاميرات</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/camera-feed" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="بث الكاميرا"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-broadcast-tower" aria-hidden="true"></i>
+          <span>بث الكاميرا</span>
+        </a>
+      </li>
+      <li class="nav-item" role="listitem">
+        <a routerLink="/unknown-faces" 
+           class="nav-link" 
+           routerLinkActive="active"
+           data-tooltip="الوجوه المجهولة"
+           (click)="onNavClick()"
+           role="menuitem">
+          <i class="fas fa-user-secret" aria-hidden="true"></i>
+          <span>الوجوه المجهولة</span>
         </a>
       </li>
     </ul>

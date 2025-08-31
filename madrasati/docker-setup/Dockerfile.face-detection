@@ -17,31 +17,34 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY madrasati/madrasati/face/requirements.txt ./
+
+# Copy requirements for face-detection
+COPY madrasati/madrasati/face/requirements-face-detection.txt ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-face-detection.txt
 
 # Copy face service files
 COPY madrasati/madrasati/face/ .
 
-# Copiez spécifiquement le fichier encodings.pkl s'il existe
-COPY madrasati/madrasati/face/encodings.pkl ./encodings.pkl
+# Copy the environment-aware face detection script
+COPY madrasati/docker-setup/app_with_env.py ./app_with_env.py
+
+# Copy the encoding synchronization script
+COPY madrasati/docker-setup/sync_encodings_with_db.py ./sync_encodings_with_db.py
+
+# Copy the unknown faces API script
+COPY madrasati/docker-setup/unknown_faces_api.py ./unknown_faces_api.py
+
+# Copy the startup script
+COPY madrasati/docker-setup/start_face_services.sh ./start_face_services.sh
 
 # Create necessary directories
-RUN mkdir -p dataset unknown_faces logs
+RUN mkdir -p dataset unknown_faces logs encodings
 
 # Set permissions
-RUN chmod +x *.py
+RUN chmod +x *.py *.sh
 
-# Environment variables
-ENV ENTRY_CAMERA_1="http://192.168.1.66:8080/video"
-ENV ENTRY_CAMERA_2="1"
-ENV EXIT_CAMERA_1="0"
-ENV EXIT_CAMERA_2="http://192.168.1.68:5001/video"
-ENV EXIT_CAMERA_3="0"
+EXPOSE 5000 5001
 
-EXPOSE 5000
-
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "chmod +x start_face_services.sh && ./start_face_services.sh"]

@@ -1,0 +1,53 @@
+/* Ensure body becomes visible after app loads */
+:host {
+  display: block;
+}
+
+body {
+  opacity: 1 !important;
+}
+
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.sidebar-wrapper {
+  flex-shrink: 0;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0; /* Prevents flex item from overflowing */
+  display: flex;
+  flex-direction: column;
+  /* Only enable transitions after app is loaded */
+}
+
+/* Enable transitions only after loading to prevent flicker on refresh */
+.app-container.loaded .main-content {
+  transition: all 0.3s ease;
+}
+
+.main-content.full-width {
+  width: 100%;
+}
+
+.main-content.sidebar-collapsed {
+  /* When sidebar is collapsed, apply minimal shift for visual balance */
+  /* Fine-tuned to 10px left to slightly compensate for sidebar asymmetry */
+  transform: translateX(-10px);
+}
+
+/* Enable transform transition only after loading */
+.app-container.loaded .main-content.sidebar-collapsed {
+  transition: transform 0.3s ease;
+}
+
+/* On mobile, don't apply the collapsed transform */
+@media (max-width: 768px) {
+  .main-content.sidebar-collapsed {
+    transform: none;
+  }
+}

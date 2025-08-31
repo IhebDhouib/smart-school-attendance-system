@@ -1,2 +1,13 @@
-<app-sidebar *ngIf="showSidebar"></app-sidebar>
-<router-outlet></router-outlet>
+<div class="app-container" [class.loaded]="isLoaded">
+  <app-sidebar 
+    *ngIf="showSidebar" 
+    class="sidebar-wrapper"
+    (collapsedChange)="onSidebarCollapsedChange($event)">
+  </app-sidebar>
+  
+  <div class="main-content" 
+       [class.full-width]="!showSidebar"
+       [class.sidebar-collapsed]="showSidebar && sidebarCollapsed">
+    <router-outlet></router-outlet>
+  </div>
+</div>

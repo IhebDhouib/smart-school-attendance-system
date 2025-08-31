@@ -23,6 +23,46 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Helper function to convert local file paths to HTTP URLs
+const convertPhotosToUrls = (student, req) => {
+  if (student.photos && student.photos.length > 0) {
+    student.photos = student.photos.map((photoPath) => {
+      // Convert 'uploads/filename.jpg' to proper URL
+      if (photoPath && !photoPath.startsWith("http")) {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const absoluteUrl = `${baseUrl}/${photoPath}`;
+
+        console.log(`[PHOTO_URL] Converting ${photoPath} to ${absoluteUrl}`);
+        return absoluteUrl;
+      }
+      return photoPath;
+    });
+
+    // Also provide relative URLs as a backup
+    student.photosRelative = student.photos.map((photoPath) => {
+      if (photoPath && photoPath.includes("uploads/")) {
+        return photoPath.replace(/.*\/(uploads\/.*)/, "/$1");
+      }
+      return photoPath;
+    });
+
+    // Add debug info for frontend troubleshooting
+    student.photoDebug = {
+      hasPhotos: true,
+      photoCount: student.photos.length,
+      firstPhotoUrl: student.photos[0],
+      relativeUrl: student.photosRelative[0],
+      testPageUrl: `${req.protocol}://${req.get("host")}/test-photo`,
+    };
+  } else {
+    student.photoDebug = {
+      hasPhotos: false,
+      photoCount: 0,
+      message: "No photos found for this student",
+    };
+  }
+  return student;
+};
 
 // =============================
 // ADD STUDENT
@@ -30,20 +70,46 @@ const upload = multer({ storage });
 router.post("/", upload.array("photos", 5), async (req, res) => {
   try {
     const { matricule, fullName, nomPere, dateNaissance, classId } = req.body;
-    const photoPaths = req.files.map((file) => file.path);
+
+    console.log("[ADD_STUDENT] Request received:", {
+      body: req.body,
+      filesCount: req.files ? req.files.length : 0,
+      contentType: req.headers["content-type"],
+    });
+
+    // Validate required fields
+    if (!matricule || !fullName || !nomPere || !dateNaissance || !classId) {
+      const missing = [];
+      if (!matricule) missing.push("matricule");
+      if (!fullName) missing.push("fullName");
+      if (!nomPere) missing.push("nomPere");
+      if (!dateNaissance) missing.push("dateNaissance");
+      if (!classId) missing.push("classId");
+
+      return res.status(400).json({
+        error: "Champs obligatoires manquants",
+        missing: missing,
+      });
+    }
+
+    // Safe file handling - only process files if they exist
+    const photoPaths =
+      req.files && Array.isArray(req.files)
+        ? req.files.map((file) => file.path)
+        : [];
 
     const student = new Student({
       matricule,
       fullName,
       nomPere,
-      dateNaissance,
+      dateNaissance: new Date(dateNaissance),
       classId,
       photos: photoPaths,
     });
 
     await student.save();
 
-    // 🔥 Call Python API for encoding
+    // 🔥 Call Python API for encoding only if photos exist
     if (photoPaths.length > 0) {
       try {
         for (let i = 0; i < student.photos.length; i++) {
@@ -65,9 +131,26 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
       }
     }
 
-    res.status(201).json(student);
+    // Convert photo paths to URLs before returning
+    const studentObj = student.toObject();
+    const studentWithUrls = convertPhotosToUrls(studentObj, req);
+
+    res.status(201).json(studentWithUrls);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error("[ADD_STUDENT] Error:", err);
+
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Matricule déjà utilisé" });
+    }
+
+    if (err.name === "ValidationError") {
+      return res.status(400).json({
+        error: "Erreur de validation",
+        details: err.message,
+      });
+    }
+
+    res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });
 
@@ -101,9 +184,17 @@ router.delete("/:id", async (req, res) => {
 // =============================
 router.put("/:id", upload.array("photos", 5), async (req, res) => {
   try {
+    console.log("[UPDATE_STUDENT] Request received:", {
+      id: req.params.id,
+      body: req.body,
+      filesCount: req.files ? req.files.length : 0,
+      contentType: req.headers["content-type"],
+    });
+
     const updateData = { ...req.body };
 
-    if (req.files && req.files.length > 0) {
+    // Safe file handling - only process files if they exist and are an array
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const photoPaths = req.files.map((file) => file.path);
       updateData.photos = photoPaths;
     }
@@ -137,20 +228,50 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
       }
     }
 
-    res.json(student);
+    // Convert photo paths to URLs before returning
+    const studentObj = student.toObject();
+    const studentWithUrls = convertPhotosToUrls(studentObj, req);
+
+    res.json(studentWithUrls);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error("[UPDATE_STUDENT] Error:", err);
+
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Matricule déjà utilisé" });
+    }
+
+    if (err.name === "ValidationError") {
+      return res.status(400).json({
+        error: "Erreur de validation",
+        details: err.message,
+      });
+    }
+
+    if (err.name === "CastError") {
+      return res.status(400).json({
+        error: "ID étudiant invalide",
+        details: err.message,
+      });
+    }
+
+    res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });
 
 module.exports = router;
 
-
 // Lister tous les étudiants (avec classe peuplée)
 router.get("/", async (req, res) => {
   try {
     const students = await Student.find().populate("classId");
-    res.json(students);
+
+    // Convert photo paths to URLs for each student
+    const studentsWithUrls = students.map((student) => {
+      const studentObj = student.toObject();
+      return convertPhotosToUrls(studentObj, req);
+    });
+
+    res.json(studentsWithUrls);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -161,13 +282,16 @@ router.get("/:id", async (req, res) => {
   try {
     const student = await Student.findById(req.params.id).populate("classId");
     if (!student) return res.status(404).json({ error: "Étudiant non trouvé" });
-    res.json(student);
+
+    // Convert photo paths to URLs
+    const studentObj = student.toObject();
+    const studentWithUrls = convertPhotosToUrls(studentObj, req);
+
+    res.json(studentWithUrls);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-
 
 // Route POST pour l’importation depuis Excel
 // Route POST pour l’importation depuis Excel

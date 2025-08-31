@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { environment } from '../environments/environment';
 
 export interface AttendanceRecord {
   _id: string;
@@ -30,7 +31,7 @@ export interface ClassAttendanceResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AttendanceService {
-  private apiUrl = 'http://backend:3000/api/attendance';
+  private apiUrl = `${environment.apiUrl}/attendance`;
 
   constructor(private http: HttpClient) {}
 
@@ -93,5 +94,22 @@ export class AttendanceService {
     return this.http
       .get<AttendanceRecord[]>(`${this.apiUrl}/date-range`, { params })
       .pipe(map(res => res ?? []));
+  }
+
+  /**
+   * Get current status for all students in a class (present/absent based on latest entry/exit)
+   */
+  getCurrentStatusByClass(classId: string): Observable<ClassAttendanceResponse> {
+    return this.http
+      .get<ClassAttendanceResponse>(`${this.apiUrl}/class/${classId}/current-status`)
+      .pipe(
+        map(res => res ?? {
+          classInfo: null,
+          attendanceSummary: [],
+          totalStudents: 0,
+          presentStudents: 0,
+          absentStudents: 0
+        })
+      );
   }
 }

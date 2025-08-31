@@ -6,7 +6,6 @@ import face_recognition
 from PIL import Image, ImageEnhance
 import time
 from collections import Counter
-from utils_copy import load_config, validate_encodings
 from fastapi import FastAPI, UploadFile, Form
 import shutil
 
@@ -14,7 +13,7 @@ app = FastAPI()
 
 # Configuration
 DATASET_DIR = "dataset"
-ENCODINGS_FILE = "encodings.pkl"
+ENCODINGS_FILE = "/app/encodings/encodings.pkl"
 SUPPORTED_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.bmp', '.tiff')
 
 def validate_dataset():

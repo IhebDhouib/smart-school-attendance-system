@@ -38,12 +38,10 @@ router.get("/", async (req, res) => {
       message: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({
-        message: "Error fetching attendance records",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching attendance records",
+      error: error.message,
+    });
   }
 });
 
@@ -111,12 +109,10 @@ router.get("/class/:classId", async (req, res) => {
       params: req.params,
       query: req.query,
     });
-    res
-      .status(500)
-      .json({
-        message: "Error fetching class attendance",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching class attendance",
+      error: error.message,
+    });
   }
 });
 
@@ -152,12 +148,10 @@ router.get("/student/:matricule", async (req, res) => {
       params: req.params,
       query: req.query,
     });
-    res
-      .status(500)
-      .json({
-        message: "Error fetching student attendance",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching student attendance",
+      error: error.message,
+    });
   }
 });
 
@@ -193,12 +187,10 @@ router.get("/date-range", async (req, res) => {
       stack: error.stack,
       query: req.query,
     });
-    res
-      .status(500)
-      .json({
-        message: "Error fetching attendance by date range",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching attendance by date range",
+      error: error.message,
+    });
   }
 });
 
@@ -258,11 +250,9 @@ router.post("/", async (req, res) => {
 
     if (existing) {
       dbg("Attendance already exists for today - returning 400", existing._id);
-      return res
-        .status(400)
-        .json({
-          message: "Attendance already recorded for this student today",
-        });
+      return res.status(400).json({
+        message: "Attendance already recorded for this student today",
+      });
     }
 
     // create attendance (log the to-be-saved doc)
@@ -290,12 +280,127 @@ router.post("/", async (req, res) => {
       query: req.query,
     });
     // return full error message (ou un message générique selon ta politique)
-    res
-      .status(500)
-      .json({
-        message: "Error creating attendance record",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error creating attendance record",
+      error: error.message,
+    });
+  }
+});
+
+// Get current status for a class (present/absent based on any detection today)
+router.get("/class/:classId/current-status", async (req, res) => {
+  dbg("REQ GET /api/attendance/class/:classId/current-status", req.params);
+  try {
+    const { classId } = req.params;
+
+    // Get all students for the class
+    const allStudents = await Student.find({ classId });
+    dbg("allStudents for current status", { count: allStudents.length });
+
+    // Get today's date range (start and end of day)
+    const today = new Date();
+    const startOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const endOfDay = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + 1
+    );
+
+    dbg("Date range for today's attendance check", {
+      today: today.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      classId,
+      todayLocalString: today.toLocaleDateString(),
+      startOfDayLocalString: startOfDay.toLocaleDateString(),
+    });
+
+    const statusSummary = await Promise.all(
+      allStudents.map(async (student) => {
+        // Check if student has ANY attendance record for today
+        const todayRecord = await Attendance.findOne({
+          studentId: student.matricule,
+          timestamp: {
+            $gte: startOfDay,
+            $lt: endOfDay,
+          },
+        }).sort({ timestamp: -1 }); // Get the latest record of today
+
+        // Debug: Check what records exist for this student (any date)
+        const allRecordsForStudent = await Attendance.find({
+          studentId: student.matricule,
+        })
+          .sort({ timestamp: -1 })
+          .limit(3);
+
+        dbg(
+          `Student ${student.matricule} (${student.fullName}) attendance check`,
+          {
+            matricule: student.matricule,
+            todayRecord: todayRecord
+              ? {
+                  id: todayRecord._id,
+                  timestamp: todayRecord.timestamp,
+                  timestampISO: todayRecord.timestamp.toISOString(),
+                }
+              : null,
+            recentRecords: allRecordsForStudent.map((r) => ({
+              id: r._id,
+              timestamp: r.timestamp,
+              timestampISO: r.timestamp.toISOString(),
+            })),
+            dateRange: {
+              startOfDay: startOfDay.toISOString(),
+              endOfDay: endOfDay.toISOString(),
+            },
+          }
+        );
+
+        // Student is present if they have any detection today (entry OR exit)
+        const isPresent = todayRecord !== null;
+
+        return {
+          studentId: student.matricule,
+          fullName: student.fullName,
+          nomPere: student.nomPere,
+          isPresent: isPresent,
+          timestamp: todayRecord ? todayRecord.timestamp : null,
+          attendanceId: todayRecord ? todayRecord._id : null,
+          lastCamera: todayRecord ? todayRecord.camera : null,
+        };
+      })
+    );
+
+    const classInfo = await Classroom.findById(classId);
+    res.json({
+      classInfo: classInfo
+        ? { name: classInfo.name, grade: classInfo.grade }
+        : null,
+      attendanceSummary: statusSummary,
+      totalStudents: allStudents.length,
+      presentCount: statusSummary.filter((s) => s.isPresent).length,
+      absentCount: statusSummary.filter((s) => !s.isPresent).length,
+    });
+
+    dbg("Current status response", {
+      totalStudents: allStudents.length,
+      presentCount: statusSummary.filter((s) => s.isPresent).length,
+      absentCount: statusSummary.filter((s) => !s.isPresent).length,
+      dateRange: { startOfDay, endOfDay },
+    });
+  } catch (error) {
+    dbg("Error fetching current status", {
+      message: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      message: "Error fetching current status",
+      error: error.message,
+    });
   }
 });
 
@@ -316,12 +421,10 @@ router.delete("/:id", async (req, res) => {
       stack: error.stack,
       params: req.params,
     });
-    res
-      .status(500)
-      .json({
-        message: "Error deleting attendance record",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error deleting attendance record",
+      error: error.message,
+    });
   }
 });
 

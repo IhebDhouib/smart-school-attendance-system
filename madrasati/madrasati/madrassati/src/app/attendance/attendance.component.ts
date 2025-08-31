@@ -3,6 +3,8 @@ import { firstValueFrom } from 'rxjs';
 import { AttendanceService } from '../../services/attendance.service';
 import { ClassroomService } from '../../services/classroom.service';
 import { StudentService } from '../../services/student.service';
+import { AttendanceWebSocketService } from '../../services/attendance-websocket.service';
+import { environment } from '../../environments/environment';
 
 interface Classroom {
   _id: string;
@@ -41,12 +43,12 @@ export class AttendanceComponent implements OnInit {
   classrooms: Classroom[] = [];
   students: Student[] = [];
   attendanceSummary: AttendanceSummary[] = [];
+  presentCount: number = 0;
+  absentCount: number = 0;
 
-  // filtres / dates
+  // filtres / dates - unified approach
   selectedClassId: string = '';
-  selectedDate: string = ''; // pour voir qui est présent ce jour-là
-  startDate: string = '';
-  endDate: string = '';
+  selectedDate: string = ''; // single date that controls both status and records
 
   // UI / recherche / pagination
   searchTerm: string = '';
@@ -59,21 +61,83 @@ export class AttendanceComponent implements OnInit {
   loading: boolean = false;
   expandedStudentMatricule: string | null = null;
   studentRecords: { [matricule: string]: any[] } = {}; // cache des enregistrements par étudiant
+  private attendanceRecordsSubscription: any;
 
   constructor(
     private attendanceService: AttendanceService,
     private classroomService: ClassroomService,
-    private studentService: StudentService
+    private studentService: StudentService,
+    private attendanceWebSocket: AttendanceWebSocketService
   ) {
+    // Set default to today
     const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
     this.selectedDate = today.toISOString().split('T')[0];
-    this.endDate = today.toISOString().split('T')[0];
-    this.startDate = thirtyDaysAgo.toISOString().split('T')[0];
   }
 
   ngOnInit(): void {
     this.loadClassrooms();
+    this.setupWebSocketConnections();
+  }
+
+  ngOnDestroy(): void {
+    console.log('Destroying attendance component, cleaning up WebSocket subscriptions');
+    if (this.attendanceRecordsSubscription) {
+      this.attendanceRecordsSubscription.unsubscribe();
+    }
+    this.attendanceWebSocket.disconnect();
+  }
+
+  setupWebSocketConnections() {
+    console.log('Setting up WebSocket connection for attendance updates');
+    
+    // Connect to WebSocket
+    this.attendanceWebSocket.connect(environment.websocketUrl);
+    
+    // Subscribe to attendance updates (handles both records and status)
+    this.attendanceRecordsSubscription = this.attendanceWebSocket.connect(environment.websocketUrl)
+      .subscribe({
+        next: (event: any) => {
+          console.log('WebSocket event received:', event);
+          if (event && event.type === 'attendance_update') {
+            console.log('Attendance update event detected:', {
+              eventClassId: event.classId,
+              selectedClassId: this.selectedClassId,
+              match: event.classId === this.selectedClassId
+            });
+            if (event.classId === this.selectedClassId) {
+              console.log('Reloading attendance due to real-time update');
+              // Reload the attendance for current date to get updated data
+              this.loadAttendanceForSelectedDate();
+            }
+          }
+        },
+        error: (error) => {
+          console.error('WebSocket error:', error);
+        },
+        complete: () => {
+          console.log('WebSocket connection completed');
+        }
+      });
+  }
+
+  // Get student status from attendanceSummary - helper for template
+  getStudentAttendanceStatus(matricule: string): AttendanceSummary | undefined {
+    return this.attendanceSummary.find(summary => summary.studentId === matricule);
+  }
+
+  // Simple method to get status for template binding
+  isStudentPresent(matricule: string): boolean {
+    const status = this.attendanceSummary.find(s => s.studentId === matricule);
+    return status ? status.isPresent : false;
+  }
+
+  isStudentAbsent(matricule: string): boolean {
+    const status = this.attendanceSummary.find(s => s.studentId === matricule);
+    return status ? !status.isPresent : false;
+  }
+
+  isStudentUnknown(matricule: string): boolean {
+    return !this.attendanceSummary.find(s => s.studentId === matricule);
   }
 
   // load classrooms (safe typing + fallback)
@@ -107,7 +171,9 @@ export class AttendanceComponent implements OnInit {
 
       this.filteredStudents = [...this.students];
       this.updatePagination();
-      await this.loadClassPresenceForDate();
+      
+      // Load today's attendance by default
+      await this.loadTodaysAttendance();
     } catch (error) {
       console.error('Erreur chargement étudiants:', error);
       this.students = [];
@@ -116,24 +182,53 @@ export class AttendanceComponent implements OnInit {
     }
   }
 
-  // charger le résumé présent/absent pour la classe sur selectedDate
-  async loadClassPresenceForDate(): Promise<void> {
-    if (!this.selectedClassId || !this.selectedDate) return;
+  // New unified method: load today's attendance (both status and records)
+  async loadTodaysAttendance(): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+    this.selectedDate = today;
+    await this.loadAttendanceForSelectedDate();
+  }
+
+  // New unified method: load attendance for selected date (both status and records)
+  async loadAttendanceForSelectedDate(): Promise<void> {
+    if (!this.selectedClassId) return;
+    console.log('Loading attendance for date:', this.selectedDate);
     this.loading = true;
+    
+    // Clear student records cache when date changes
+    this.studentRecords = {};
+    this.expandedStudentMatricule = null;
+
     try {
       const res: any = await firstValueFrom(this.attendanceService.getAttendanceByClass(this.selectedClassId, this.selectedDate));
+      console.log('Attendance response for date:', this.selectedDate, res);
       this.attendanceSummary = (res?.attendanceSummary as AttendanceSummary[]) ?? [];
+      
+      // Update present/absent counts
+      this.presentCount = this.attendanceSummary.filter(s => s.isPresent).length;
+      this.absentCount = this.attendanceSummary.filter(s => !s.isPresent).length;
+      
+      console.log(`Present: ${this.presentCount}, Absent: ${this.absentCount}`);
       // s'assurer que filteredStudents est cohérent
       this.filterStudents();
     } catch (error) {
       console.error('Erreur chargement présence classe:', error);
       this.attendanceSummary = [];
+      this.presentCount = 0;
+      this.absentCount = 0;
     } finally {
       this.loading = false;
     }
   }
 
-  // bouton pour afficher l'historique d'un étudiant entre startDate et endDate
+  // Date change handler - unified approach
+  async onDateChange(): Promise<void> {
+    if (this.selectedClassId && this.selectedDate) {
+      await this.loadAttendanceForSelectedDate();
+    }
+  }
+
+  // bouton pour afficher l'historique d'un étudiant pour la date sélectionnée
   async viewStudentAttendance(student: { studentId?: string; matricule?: string; fullName?: string }) {
     const mat = student.studentId || student.matricule;
     if (!mat) return;
@@ -145,11 +240,9 @@ export class AttendanceComponent implements OnInit {
     }
     this.expandedStudentMatricule = mat;
 
-    // si déjà en cache, pas besoin de rappeler
-    if (this.studentRecords[mat]) return;
-
+    // Always fetch fresh data for the selected date
     try {
-      const records: any[] = (await firstValueFrom(this.attendanceService.getAttendanceByStudent(mat, this.startDate, this.endDate, this.selectedClassId))) ?? [];
+      const records: any[] = (await firstValueFrom(this.attendanceService.getAttendanceByStudent(mat, this.selectedDate, this.selectedDate, this.selectedClassId))) ?? [];
       this.studentRecords[mat] = records;
     } catch (error) {
       console.error('Erreur chargement enregistrements étudiant:', error);
@@ -244,10 +337,10 @@ formatTimeWithYear(ts: string | null): string {
     if (this.currentPage < this.totalPages) this.currentPage++;
   }
 
-  // export CSV simple (matricule, nom, nomPere, présent le selectedDate (Oui/Non), count présences dans la période)
+  // export CSV simple (matricule, nom, nomPere, présent le selectedDate (Oui/Non), count présences pour la date)
   exportToCSV(): void {
     if (!this.selectedClassId) return;
-    const headers = ['Matricule', 'Nom Complet', 'Nom du Père', `Présent le ${this.selectedDate}`, `Présences (${this.startDate} → ${this.endDate})`];
+    const headers = ['Matricule', 'Nom Complet', 'Nom du Père', `Présent le ${this.selectedDate}`, `Nombre d'enregistrements le ${this.selectedDate}`];
     const rows: string[] = [headers.join(',')];
 
     const buildCount = (mat: string) => {

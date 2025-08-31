@@ -1,0 +1,261 @@
+<div class="unknown-faces-container">
+  <div class="header-section">
+    <h2 class="page-title">
+      <i class="fas fa-user-secret"></i> 
+      الوجوه المجهولة
+    </h2>
+    <p class="page-description">إدارة الوجوه المجهولة المكتشفة بواسطة نظام التعرف على الوجوه</p>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-section">
+    <div class="stats-card">
+      <div class="stat-icon">
+        <i class="fas fa-images"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-number">{{ stats.total }}</div>
+        <div class="stat-label">إجمالي الوجوه</div>
+      </div>
+    </div>
+    
+    <div class="stats-card">
+      <div class="stat-icon">
+        <i class="fas fa-calendar-day"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-number">{{ stats.today }}</div>
+        <div class="stat-label">اليوم</div>
+      </div>
+    </div>
+    
+    <div class="stats-card">
+      <div class="stat-icon">
+        <i class="fas fa-calendar-week"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-number">{{ stats.this_week }}</div>
+        <div class="stat-label">هذا الأسبوع</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section">
+    <div class="filter-group">
+      <label for="searchInput">البحث:</label>
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input 
+          type="text" 
+          id="searchInput"
+          placeholder="ابحث باسم الملف أو المعرف..." 
+          [(ngModel)]="searchTerm" 
+          (input)="onSearchChange()"
+          class="search-input" />
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label for="dateFilter">فلترة التاريخ:</label>
+      <select id="dateFilter" [(ngModel)]="selectedDateFilter" (change)="onDateFilterChange()" class="form-select">
+        <option value="all">جميع التواريخ</option>
+        <option value="today">اليوم</option>
+        <option value="week">آخر أسبوع</option>
+        <option value="custom">تاريخ مخصص</option>
+      </select>
+    </div>
+
+    <div class="filter-group" *ngIf="selectedDateFilter === 'custom'">
+      <label for="startDate">من:</label>
+      <input 
+        type="date" 
+        id="startDate" 
+        [(ngModel)]="customStartDate" 
+        (change)="onCustomDateChange()"
+        class="form-input" />
+    </div>
+
+    <div class="filter-group" *ngIf="selectedDateFilter === 'custom'">
+      <label for="endDate">إلى:</label>
+      <input 
+        type="date" 
+        id="endDate" 
+        [(ngModel)]="customEndDate" 
+        (change)="onCustomDateChange()"
+        class="form-input" />
+    </div>
+
+    <div class="filter-group">
+      <button class="btn btn-primary" (click)="refresh()" [disabled]="loading">
+        <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+        تحديث
+      </button>
+    </div>
+
+    <div class="filter-group">
+      <button 
+        class="btn" 
+        [class.btn-success]="autoRefresh" 
+        [class.btn-secondary]="!autoRefresh"
+        (click)="toggleAutoRefresh()">
+        <i class="fas fa-toggle-on" *ngIf="autoRefresh"></i>
+        <i class="fas fa-toggle-off" *ngIf="!autoRefresh"></i>
+        تحديث تلقائي ({{ refreshIntervalSeconds }}ث)
+      </button>
+    </div>
+  </div>
+
+  <!-- Actions Section -->
+  <div class="actions-section" *ngIf="unknownFaces.length > 0">
+    <div class="bulk-actions">
+      <div class="select-all">
+        <input 
+          type="checkbox" 
+          id="selectAll"
+          [(ngModel)]="selectAll" 
+          (change)="toggleSelectAll()" />
+        <label for="selectAll">تحديد الكل</label>
+      </div>
+      
+      <button 
+        class="btn btn-danger" 
+        (click)="deleteSelected()" 
+        [disabled]="selectedFaces.size === 0 || loading">
+        <i class="fas fa-trash"></i>
+        حذف المحدد ({{ selectedFaces.size }})
+      </button>
+    </div>
+
+    <div class="view-info">
+      عرض {{ paginatedFaces.length }} من {{ filteredFaces.length }} وجه
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>جاري تحميل الوجوه المجهولة...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error" class="error-state">
+    <i class="fas fa-exclamation-triangle"></i>
+    <p>{{ error }}</p>
+    <button class="btn btn-primary" (click)="refresh()">
+      <i class="fas fa-retry"></i>
+      إعادة المحاولة
+    </button>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && !error && unknownFaces.length === 0" class="empty-state">
+    <i class="fas fa-user-check"></i>
+    <h3>لا توجد وجوه مجهولة</h3>
+    <p>لم يتم رصد أي وجوه مجهولة بعد</p>
+  </div>
+
+  <!-- No Results State -->
+  <div *ngIf="!loading && !error && unknownFaces.length > 0 && filteredFaces.length === 0" class="empty-state">
+    <i class="fas fa-search"></i>
+    <h3>لا توجد نتائج</h3>
+    <p>لم يتم العثور على وجوه تطابق معايير البحث</p>
+    <button class="btn btn-secondary" (click)="searchTerm = ''; selectedDateFilter = 'all'; onSearchChange()">
+      <i class="fas fa-times"></i>
+      مسح الفلاتر
+    </button>
+  </div>
+
+  <!-- Faces Grid -->
+  <div *ngIf="!loading && !error && paginatedFaces.length > 0" class="faces-grid">
+    <div 
+      *ngFor="let face of paginatedFaces" 
+      class="face-card"
+      [class.selected]="selectedFaces.has(face.filename)">
+      
+      <div class="face-header">
+        <div class="face-selection">
+          <input 
+            type="checkbox" 
+            [id]="'face-' + face.filename"
+            [checked]="selectedFaces.has(face.filename)"
+            (change)="toggleFaceSelection(face.filename)" />
+        </div>
+        <div class="face-actions">
+          <button 
+            class="btn-icon btn-danger" 
+            (click)="deleteFace(face.filename)"
+            title="حذف الصورة">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="face-image">
+        <img 
+          [src]="getImageUrl(face)" 
+          [alt]="face.filename"
+          (error)="onImageError($event)"
+          loading="lazy" />
+        <div class="image-overlay">
+          <span class="image-id">{{ face.id }}</span>
+        </div>
+      </div>
+
+      <div class="face-info">
+        <div class="info-row">
+          <strong>المعرف:</strong>
+          <span>{{ face.id }}</span>
+        </div>
+        <div class="info-row">
+          <strong>التاريخ:</strong>
+          <span>{{ formatTimestamp(face.timestamp) }}</span>
+        </div>
+        <div class="info-row">
+          <strong>الحجم:</strong>
+          <span>{{ formatFileSize(face.size) }}</span>
+        </div>
+        <div class="info-row filename">
+          <strong>اسم الملف:</strong>
+          <span title="{{ face.filename }}">{{ face.filename }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="totalPages > 1" class="pagination-section">
+    <div class="pagination">
+      <button 
+        class="btn btn-secondary" 
+        (click)="previousPage()" 
+        [disabled]="currentPage === 1">
+        <i class="fas fa-chevron-right"></i>
+        السابق
+      </button>
+
+      <div class="page-numbers">
+        <button 
+          *ngFor="let page of [].constructor(totalPages); let i = index"
+          class="btn"
+          [class.btn-primary]="currentPage === i + 1"
+          [class.btn-secondary]="currentPage !== i + 1"
+          (click)="goToPage(i + 1)">
+          {{ i + 1 }}
+        </button>
+      </div>
+
+      <button 
+        class="btn btn-secondary" 
+        (click)="nextPage()" 
+        [disabled]="currentPage === totalPages">
+        التالي
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    </div>
+
+    <div class="pagination-info">
+      صفحة {{ currentPage }} من {{ totalPages }}
+    </div>
+  </div>
+</div>

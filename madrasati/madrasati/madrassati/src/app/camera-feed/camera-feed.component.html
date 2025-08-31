@@ -1,0 +1,309 @@
+<div class="camera-feed-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <h1 class="page-title">
+      <i class="fas fa-video" aria-hidden="true"></i>
+      بث الكاميرا المباشر
+    </h1>
+    <p class="page-subtitle">مراقبة الكاميرا في الوقت الفعلي</p>
+  </div>
+
+  <!-- Camera Controls -->
+  <div class="camera-controls">
+    <div class="control-group">
+      <h3>
+        <i class="fas fa-cog"></i>
+        إعدادات الكاميرا
+      </h3>
+      <div class="controls-grid">
+        <div class="form-group">
+          <label for="camera-source">مصدر الكاميرا</label>
+          <select id="camera-source" [(ngModel)]="selectedCamera" (change)="switchCamera()">
+            <option value="ip">كاميرا IP (IP Webcam)</option>
+            <option value="saved">الكاميرات المحفوظة</option>
+            <option value="local">الكاميرا المحلية</option>
+            <option value="custom">مصدر مخصص</option>
+          </select>
+        </div>
+        <div class="form-group" *ngIf="selectedCamera === 'local'">
+          <label for="local-camera">اختر الكاميرا المحلية</label>
+          <select id="local-camera" [(ngModel)]="selectedDeviceId" (change)="switchLocalCamera()">
+            <option value="" disabled>اختر كاميرا...</option>
+            <option *ngFor="let camera of availableCameras" [value]="camera.deviceId">
+              {{ camera.label }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group" *ngIf="selectedCamera === 'saved'">
+          <label for="saved-camera">اختر الكاميرا المحفوظة</label>
+          <div class="camera-select-wrapper">
+            <select id="saved-camera" [(ngModel)]="selectedSavedCameraId" (change)="switchSavedCamera()">
+              <option value="" disabled>اختر كاميرا...</option>
+              <option *ngFor="let camera of savedCameras" [value]="camera._id">
+                {{ camera.name }} ({{ camera.ip }}:{{ camera.port }}) - {{ camera.type === 'entry' ? 'دخول' : 'خروج' }}
+              </option>
+            </select>
+            <button type="button" class="btn-refresh" (click)="refreshSavedCameras()" title="تحديث القائمة">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+          <p class="info-message" *ngIf="savedCameras.length === 0">
+            <i class="fas fa-info-circle"></i>
+            لا توجد كاميرات محفوظة. يمكنك إضافة كاميرات جديدة من صفحة إدارة الكاميرات.
+          </p>
+        </div>
+        <div class="form-group" *ngIf="selectedCamera === 'custom'">
+          <label for="custom-url">رابط الكاميرا المخصص</label>
+          <input id="custom-url" type="text" [(ngModel)]="customCameraUrl" placeholder="http://192.168.1.14:8080/video" (input)="validateCustomUrl()">
+          <p class="info-message">
+            <strong>نصائح للاتصال بكاميرا IP:</strong><br>
+            1. تأكد من تشغيل تطبيق IP Webcam على الهاتف<br>
+            2. اتصل بنفس شبكة WiFi<br>
+            3. استخدم الرابط الصحيح مثل: http://192.168.1.14:8080/video<br>
+            4. في المتصفح، اسمح بالمحتوى غير الآمن (Mixed Content)
+          </p>
+          <p class="error-message" *ngIf="customCameraUrl && !isValidUrl(customCameraUrl)">رابط غير صالح. أدخل رابطًا يبدأ بـ http:// أو https://</p>
+        </div>
+        <div class="form-group" *ngIf="selectedCamera === 'local'">
+          <label for="stream-quality">جودة البث (للكاميرا المحلية فقط)</label>
+          <select id="stream-quality" [(ngModel)]="streamQuality" (change)="changeQuality()">
+            <option value="high">عالية (1080p)</option>
+            <option value="medium">متوسطة (720p)</option>
+            <option value="low">منخفضة (480p)</option>
+          </select>
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button class="btn btn-primary" (click)="startStream()" [disabled]="isStreaming || isConnecting">
+          <i class="fas fa-play"></i>
+          بدء البث
+        </button>
+        <button class="btn btn-secondary" (click)="stopStream()" [disabled]="!isStreaming">
+          <i class="fas fa-stop"></i>
+          إيقاف البث
+        </button>
+        <button class="btn btn-warning" (click)="captureFrame()" [disabled]="!isStreaming">
+          <i class="fas fa-camera"></i>
+          التقاط صورة
+        </button>
+        <button class="btn btn-danger" (click)="toggleRecording()" [disabled]="!isStreaming || isIPStream">
+          <i class="fas" [ngClass]="isRecording ? 'fa-stop-circle' : 'fa-record-vinyl'"></i>
+          {{ isRecording ? 'إيقاف التسجيل' : 'بدء التسجيل' }}
+        </button>
+        <p class="info-message" *ngIf="isIPStream">
+          <i class="fas fa-info-circle"></i>
+          التسجيل غير متاح لكاميرات IP - يمكنك التقاط الصور فقط
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Feed Display -->
+  <div class="camera-display">
+    <div class="feed-container">
+      <div class="feed-header">
+        <h3>
+          <i class="fas fa-video"></i>
+          البث المباشر
+        </h3>
+        <div class="feed-status">
+          <span class="status-indicator" [ngClass]="connectionStatus"></span>
+          <span class="status-text">{{ getConnectionStatusText() }}</span>
+        </div>
+      </div>
+      
+      <div class="video-wrapper">
+        <!-- Video Element pour caméras locales -->
+        <video #videoElement 
+               class="camera-video" 
+               [style.display]="isStreaming && !isIPStream ? 'block' : 'none'"
+               autoplay 
+               muted>
+        </video>
+        
+        <!-- Image Element pour caméras IP (MJPEG) -->
+        <img #imageElement 
+             class="camera-image" 
+             [style.display]="isStreaming && isIPStream ? 'block' : 'none'"
+             alt="IP Camera Stream">
+        
+        <div class="placeholder" *ngIf="!isStreaming">
+          <i class="fas fa-video-slash"></i>
+          <h4>البث غير متاح</h4>
+          <p>اضغط على "بدء البث" لبدء مشاهدة الكاميرا</p>
+          <div class="ip-camera-help" *ngIf="selectedCamera === 'ip'">
+            <h5><i class="fas fa-mobile-alt"></i> للاتصال بكاميرا IP Webcam:</h5>
+            <ol>
+              <li>قم بتشغيل تطبيق "IP Webcam" على هاتفك الأندرويد</li>
+              <li>اضغط على "Start Server" في التطبيق</li>
+              <li>تأكد من الاتصال بنفس شبكة WiFi</li>
+              <li>استخدم عنوان IP الذي يظهر في التطبيق</li>
+              <li>الرابط الحالي: <strong>http://192.168.1.14:8080/video</strong></li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="loading-overlay" *ngIf="isConnecting">
+          <div class="spinner"></div>
+          <p *ngIf="selectedCamera === 'ip' || selectedCamera === 'custom'">
+            جاري الاتصال بكاميرا IP...<br>
+            <small>قد يستغرق هذا بضع ثوانٍ</small>
+          </p>
+          <p *ngIf="selectedCamera === 'local'">جاري الاتصال بالكاميرا المحلية...</p>
+        </div>
+
+        <!-- Video Controls Overlay -->
+        <div class="video-controls" *ngIf="isStreaming">
+          <div class="controls-overlay">
+            <button class="control-btn" (click)="toggleFullscreen()">
+              <i class="fas fa-expand"></i>
+            </button>
+            <button class="control-btn" (click)="toggleMute()" *ngIf="!isIPStream">
+              <i class="fas" [ngClass]="isMuted ? 'fa-volume-mute' : 'fa-volume-up'"></i>
+            </button>
+            <div class="volume-control" *ngIf="!isIPStream">
+              <input type="range" min="0" max="100" [(ngModel)]="volume" (input)="adjustVolume()">
+            </div>
+            <div class="ip-camera-info" *ngIf="isIPStream">
+              <i class="fas fa-info-circle"></i>
+              <span>كاميرا IP - لا يتوفر تحكم بالصوت</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stream Information -->
+      <div class="stream-info" *ngIf="isStreaming">
+        <div class="info-grid">
+          <div class="info-item">
+            <i class="fas fa-signal"></i>
+            <span class="info-label">حالة الاتصال:</span>
+            <span class="info-value" [ngClass]="connectionStatus">{{ getConnectionStatusText() }}</span>
+          </div>
+          <div class="info-item">
+            <i class="fas fa-clock"></i>
+            <span class="info-label">مدة البث:</span>
+            <span class="info-value">{{ streamDuration }}</span>
+          </div>
+          <div class="info-item" *ngIf="isIPStream">
+            <i class="fas fa-camera"></i>
+            <span class="info-label">نوع البث:</span>
+            <span class="info-value">MJPEG Stream</span>
+          </div>
+          <div class="info-item" *ngIf="!isIPStream && selectedCamera === 'local'">
+            <i class="fas fa-video"></i>
+            <span class="info-label">الجودة:</span>
+            <span class="info-value">{{ getQualityDisplayName() }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Captures -->
+  <div class="captures-section" *ngIf="captures.length > 0">
+    <div class="section-header">
+      <h3>
+        <i class="fas fa-images"></i>
+        الصور والتسجيلات المحفوظة
+      </h3>
+      <button class="btn btn-secondary btn-sm" (click)="clearCaptures()">
+        <i class="fas fa-trash"></i>
+        مسح الكل
+      </button>
+    </div>
+    
+    <div class="captures-grid">
+      <div class="capture-item" *ngFor="let capture of captures; let i = index">
+        <div class="capture-preview" (click)="viewCapture(capture)">
+          <img *ngIf="capture.type === 'image'" [src]="capture.url" [alt]="capture.name">
+          <video *ngIf="capture.type === 'video'" [src]="capture.url" muted></video>
+          <div class="capture-type-icon">
+            <i class="fas" [ngClass]="capture.type === 'video' ? 'fa-video' : 'fa-image'"></i>
+          </div>
+        </div>
+        <div class="capture-info">
+          <span class="capture-name">{{ capture.name }}</span>
+          <span class="capture-time">{{ capture.timestamp | date:'short':'ar' }}</span>
+          <div class="capture-actions">
+            <button class="btn btn-sm btn-primary" (click)="downloadCapture(capture)" title="تحميل">
+              <i class="fas fa-download"></i>
+            </button>
+            <button class="btn btn-sm btn-info" (click)="viewCapture(capture)" title="عرض">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" (click)="deleteCapture(i)" title="حذف">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Logs -->
+  <div class="logs-section">
+    <div class="section-header">
+      <h3>
+        <i class="fas fa-list"></i>
+        سجل الأحداث
+      </h3>
+      <button class="btn btn-secondary btn-sm" (click)="clearLogs()">
+        <i class="fas fa-trash"></i>
+        مسح السجل
+      </button>
+    </div>
+    
+    <div class="logs-container">
+      <div class="log-entry" 
+           *ngFor="let log of logs" 
+           [ngClass]="log.type">
+        <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+        <span class="log-message">{{ log.message }}</span>
+      </div>
+      
+      <div class="empty-logs" *ngIf="logs.length === 0">
+        <i class="fas fa-clipboard"></i>
+        <p>لا توجد أحداث مسجلة</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions pour IP Webcam -->
+  <div class="help-section" *ngIf="selectedCamera === 'ip'">
+    <div class="help-card">
+      <h4><i class="fas fa-question-circle"></i> كيفية استخدام IP Webcam</h4>
+      <div class="help-steps">
+        <div class="step">
+          <span class="step-number">1</span>
+          <div class="step-content">
+            <h5>تحميل التطبيق</h5>
+            <p>قم بتحميل تطبيق "IP Webcam" من متجر Google Play على هاتف الأندرويد</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-number">2</span>
+          <div class="step-content">
+            <h5>تشغيل الخادم</h5>
+            <p>افتح التطبيق واضغط على "Start Server" لبدء بث الكاميرا</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-number">3</span>
+          <div class="step-content">
+            <h5>الحصول على العنوان</h5>
+            <p>سيظهر عنوان IP في التطبيق مثل: http://192.168.1.14:8080</p>
+          </div>
+        </div>
+        <div class="step">
+          <span class="step-number">4</span>
+          <div class="step-content">
+            <h5>الاتصال</h5>
+            <p>تأكد من أن الحاسوب والهاتف متصلان بنفس شبكة WiFi واضغط "بدء البث"</p>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>

@@ -1,0 +1,42 @@
+# Fused Face API + Detection Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies for OpenCV and face_recognition
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libopencv-dev \
+    python3-opencv \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# Copy fused requirements
+COPY madrasati/face/requirements-fused.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements-fused.txt
+
+# Copy all face service files
+COPY madrasati/face/ ./face/
+COPY docker-setup/app_with_env.py .
+COPY docker-setup/sync_encodings_with_db.py .
+COPY docker-setup/unknown_faces_api_fastapi.py .
+
+# Create necessary directories
+RUN mkdir -p dataset unknown_faces logs encodings
+
+# Set permissions
+RUN chmod +x *.py
+
+EXPOSE 8000 5001
+
+# Startup: run FastAPI (faceapi.py) and detection (app_with_env.py)
+CMD ["sh", "-c", "uvicorn face.faceapi:app --host 0.0.0.0 --port 8000 & uvicorn unknown_faces_api_fastapi:app --host 0.0.0.0 --port 5001 & python app_with_env.py"]

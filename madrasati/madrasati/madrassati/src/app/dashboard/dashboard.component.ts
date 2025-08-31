@@ -3,23 +3,11 @@ import { Router } from '@angular/router';
 import { StudentService } from '../../services/student.service';
 import { ClassroomService } from '../../services/classroom.service';
 import { AttendanceService } from '../../services/attendance.service';
-import { TeacherService } from '../../services/Teacher.service';
 import { interval, Subscription } from 'rxjs';
+import { Chart, ChartConfiguration, ChartData, registerables } from 'chart.js';
 
-interface Activity {
-  id: string;
-  type: 'student' | 'teacher' | 'attendance' | 'system';
-  title: string;
-  description: string;
-  timestamp: Date;
-}
-
-interface Alert {
-  id: string;
-  type: 'warning' | 'danger' | 'info';
-  title: string;
-  message: string;
-}
+// Register Chart.js components
+Chart.register(...registerables);
 
 @Component({
   selector: 'app-dashboard',
@@ -33,7 +21,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Statistics
   totalStudents: number = 0;
-  totalTeachers: number = 0;
   totalClasses: number = 0;
   attendanceRate: number = 0;
 
@@ -41,10 +28,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   currentDate: Date = new Date();
   currentTime: string = '';
   private timeSubscription?: Subscription;
-
-  // Activities and Alerts
-  recentActivities: Activity[] = [];
-  alerts: Alert[] = [];
 
   // Charts
   private attendanceChart: any;
@@ -54,15 +37,12 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     private router: Router,
     private studentService: StudentService,
     private classroomService: ClassroomService,
-    private attendanceService: AttendanceService,
-    private teacherService: TeacherService
+    private attendanceService: AttendanceService
   ) {}
 
   ngOnInit(): void {
     this.loadDashboardData();
     this.startTimeUpdater();
-    this.loadRecentActivities();
-    this.loadAlerts();
   }
 
   ngAfterViewInit(): void {
@@ -75,6 +55,14 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     if (this.timeSubscription) {
       this.timeSubscription.unsubscribe();
+    }
+    
+    // Clean up charts
+    if (this.attendanceChart) {
+      this.attendanceChart.destroy();
+    }
+    if (this.studentsChart) {
+      this.studentsChart.destroy();
     }
   }
 
@@ -104,10 +92,6 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       const students = await this.studentService.getAllStudents().toPromise();
       this.totalStudents = students?.length || 0;
 
-      // Load teachers count
-      const teachers = await this.teacherService.getTeachers().toPromise();
-      this.totalTeachers = teachers?.length || 0;
-
       // Load classes count
       const classes = await this.classroomService.getClassrooms().toPromise();
       this.totalClasses = classes?.length || 0;
@@ -123,125 +107,244 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private async calculateTodayAttendanceRate(): Promise<void> {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const params = {
-        startDate: today,
-        endDate: today
-      };
+      
+      // Get all classes
+      const classes = await this.classroomService.getClassrooms().toPromise();
+      if (!classes || classes.length === 0) {
+        this.attendanceRate = 0;
+        return;
+      }
 
-      // This would need to be implemented in the attendance service
-      // For now, we'll use a mock calculation
-      this.attendanceRate = Math.floor(Math.random() * 20) + 80; // 80-100%
+      let totalStudents = 0;
+      let totalPresent = 0;
+
+      // Calculate attendance rate across all classes
+      for (const classroom of classes) {
+        try {
+          const attendanceData = await this.attendanceService.getAttendanceByClass(classroom._id, today).toPromise();
+          if (attendanceData) {
+            totalStudents += attendanceData.totalStudents;
+            totalPresent += attendanceData.presentStudents;
+          }
+        } catch (error) {
+          console.error(`Error loading attendance for class ${classroom.name}:`, error);
+        }
+      }
+
+      // Calculate percentage
+      this.attendanceRate = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+      
     } catch (error) {
       console.error('Error calculating attendance rate:', error);
       this.attendanceRate = 85; // Default value
     }
   }
 
-  private loadRecentActivities(): void {
-    // Mock data for recent activities
-    this.recentActivities = [
-      {
-        id: '1',
-        type: 'student',
-        title: 'طالب جديد مسجل',
-        description: 'تم تسجيل أحمد محمد في الصف الثالث الابتدائي',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30) // 30 minutes ago
-      },
-      {
-        id: '2',
-        type: 'attendance',
-        title: 'تسجيل حضور',
-        description: 'تم تسجيل حضور 25 طالب في الصف الثاني',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60) // 1 hour ago
-      },
-      {
-        id: '3',
-        type: 'teacher',
-        title: 'معلم جديد',
-        description: 'انضمت فاطمة أحمد كمعلمة رياضيات',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2) // 2 hours ago
-      },
-      {
-        id: '4',
-        type: 'system',
-        title: 'تحديث النظام',
-        description: 'تم تحديث نظام إدارة الحضور بنجاح',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4) // 4 hours ago
-      }
-    ];
+  private async initializeCharts(): Promise<void> {
+    await this.createAttendanceChart();
+    await this.createStudentsDistributionChart();
   }
 
-  private loadAlerts(): void {
-    // Mock data for alerts
-    this.alerts = [
-      {
-        id: '1',
-        type: 'warning',
-        title: 'انخفاض معدل الحضور',
-        message: 'معدل الحضور في الصف الأول أقل من 80% هذا الأسبوع'
+  private async createAttendanceChart(): Promise<void> {
+    if (!this.attendanceChartRef?.nativeElement) return;
+
+    // Destroy existing chart if it exists
+    if (this.attendanceChart) {
+      this.attendanceChart.destroy();
+    }
+
+    const ctx = this.attendanceChartRef.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    // Get weekly attendance data
+    const weeklyData = await this.getWeeklyAttendanceData();
+
+    const config: ChartConfiguration = {
+      type: 'line',
+      data: {
+        labels: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
+        datasets: [{
+          label: 'معدل الحضور (%)',
+          data: weeklyData,
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#667eea',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 6
+        }]
       },
-      {
-        id: '2',
-        type: 'info',
-        title: 'اجتماع المعلمين',
-        message: 'اجتماع المعلمين الأسبوعي غداً الساعة 10:00 صباحاً'
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              callback: function(value) {
+                return value + '%';
+              }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.1)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
+        }
       }
-    ];
+    };
+
+    this.attendanceChart = new Chart(ctx, config);
   }
 
-  private initializeCharts(): void {
-    // Mock chart initialization
-    // In a real implementation, you would use Chart.js or similar library
-    console.log('Charts would be initialized here');
+  private async createStudentsDistributionChart(): Promise<void> {
+    if (!this.studentsChartRef?.nativeElement) return;
+
+    // Destroy existing chart if it exists
+    if (this.studentsChart) {
+      this.studentsChart.destroy();
+    }
+
+    const ctx = this.studentsChartRef.nativeElement.getContext('2d');
+    if (!ctx) return;
+
+    // Get students distribution data
+    const distributionData = await this.getStudentsDistribution();
+
+    const config: ChartConfiguration = {
+      type: 'doughnut',
+      data: {
+        labels: distributionData.labels,
+        datasets: [{
+          data: distributionData.data,
+          backgroundColor: [
+            '#667eea',
+            '#764ba2',
+            '#f093fb',
+            '#f5576c',
+            '#4facfe',
+            '#00f2fe',
+            '#43e97b',
+            '#38f9d7'
+          ],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 20,
+              usePointStyle: true
+            }
+          }
+        }
+      }
+    };
+
+    this.studentsChart = new Chart(ctx, config);
+  }
+
+  private async getWeeklyAttendanceData(): Promise<number[]> {
+    try {
+      // Get the past 7 days
+      const weeklyRates: number[] = [];
+      const classes = await this.classroomService.getClassrooms().toPromise();
+      
+      if (!classes || classes.length === 0) {
+        return [0, 0, 0, 0, 0, 0, 0];
+      }
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+
+        let totalStudents = 0;
+        let totalPresent = 0;
+
+        // Calculate attendance rate for this date across all classes
+        for (const classroom of classes) {
+          try {
+            const attendanceData = await this.attendanceService.getAttendanceByClass(classroom._id, dateString).toPromise();
+            if (attendanceData) {
+              totalStudents += attendanceData.totalStudents;
+              totalPresent += attendanceData.presentStudents;
+            }
+          } catch (error) {
+            console.error(`Error loading attendance for ${dateString}:`, error);
+          }
+        }
+
+        const dayRate = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+        weeklyRates.push(dayRate);
+      }
+
+      return weeklyRates;
+    } catch (error) {
+      console.error('Error loading weekly attendance data:', error);
+      return [85, 88, 92, 87, 90, 89, 91]; // Fallback data
+    }
+  }
+
+  private async getStudentsDistribution(): Promise<{labels: string[], data: number[]}> {
+    try {
+      // Get all classrooms and count students in each
+      const classrooms = await this.classroomService.getClassrooms().toPromise();
+      const allStudents = await this.studentService.getAllStudents().toPromise();
+      
+      if (!classrooms || !allStudents) {
+        return { labels: [], data: [] };
+      }
+
+      const distribution = classrooms.map(classroom => {
+        const studentsInClass = allStudents.filter(student => {
+          // Handle both string and object classId
+          const studentClassId = typeof student.classId === 'string' 
+            ? student.classId 
+            : student.classId?._id;
+          return studentClassId === classroom._id;
+        });
+        
+        return {
+          label: `${classroom.name} - ${classroom.grade}`,
+          count: studentsInClass.length
+        };
+      }).filter(item => item.count > 0); // Only show classes with students
+
+      return {
+        labels: distribution.map(item => item.label),
+        data: distribution.map(item => item.count)
+      };
+    } catch (error) {
+      console.error('Error loading students distribution:', error);
+      return {
+        labels: ['الصف الأول', 'الصف الثاني', 'الصف الثالث'],
+        data: [25, 30, 20] // Fallback data
+      };
+    }
   }
 
   // Navigation methods
   navigateTo(route: string): void {
     this.router.navigate([route]);
-  }
-
-  viewAllActivities(): void {
-    // Navigate to activities page or show modal
-    console.log('View all activities');
-  }
-
-  generateReport(): void {
-    // Generate and download report
-    console.log('Generate report');
-  }
-
-  // Activity helpers
-  getActivityIcon(type: string): string {
-    switch (type) {
-      case 'student':
-        return 'fa-user-graduate';
-      case 'teacher':
-        return 'fa-chalkboard-teacher';
-      case 'attendance':
-        return 'fa-check-circle';
-      case 'system':
-        return 'fa-cog';
-      default:
-        return 'fa-info-circle';
-    }
-  }
-
-  // Alert helpers
-  getAlertIcon(type: string): string {
-    switch (type) {
-      case 'warning':
-        return 'fa-exclamation-triangle';
-      case 'danger':
-        return 'fa-times-circle';
-      case 'info':
-        return 'fa-info-circle';
-      default:
-        return 'fa-bell';
-    }
-  }
-
-  dismissAlert(alertId: string): void {
-    this.alerts = this.alerts.filter(alert => alert.id !== alertId);
   }
 }
 

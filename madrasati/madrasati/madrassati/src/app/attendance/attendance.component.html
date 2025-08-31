@@ -1,7 +1,6 @@
 <div class="attendance-container">
   <div class="header-section">
     <h2 class="page-title"><i class="fas fa-calendar-check"></i> إدارة الحضور</h2>
-    <p class="page-description">استشر الحضور حسب الصف و التاريخ</p>
   </div>
 
   <div class="filters-section">
@@ -16,25 +15,22 @@
     </div>
 
     <div class="filter-group">
-      <label for="dateSelect">التاريخ (لرؤية الحاضرين):</label>
-      <input type="date" id="dateSelect" [(ngModel)]="selectedDate" (change)="loadClassPresenceForDate()"
+      <label for="dateSelect">التاريخ المحدد:</label>
+      <input type="date" id="dateSelect" [(ngModel)]="selectedDate" (change)="onDateChange()"
         class="form-input" />
     </div>
 
     <div class="filter-group">
-      <label for="startDate">من الفترة (لعرض سجل الطالب):</label>
-      <input type="date" id="startDate" [(ngModel)]="startDate" class="form-input" />
+      <button class="btn btn-primary" (click)="loadAttendanceForSelectedDate()"
+        [disabled]="!selectedClassId">
+        <i class="fas fa-calendar-check"></i> عرض الحضور للتاريخ المحدد
+      </button>
     </div>
 
     <div class="filter-group">
-      <label for="endDate">إلى الفترة :</label>
-      <input type="date" id="endDate" [(ngModel)]="endDate" class="form-input" />
-    </div>
-
-    <div class="filter-group">
-      <button class="btn btn-primary" (click)="loadClassPresenceForDate()"
-        [disabled]="!selectedClassId || !selectedDate">
-        <i class="fas fa-search"></i> عرض الحضور
+      <button class="btn btn-secondary" (click)="loadTodaysAttendance()"
+        [disabled]="!selectedClassId">
+        <i class="fas fa-users"></i> عرض حضور اليوم
       </button>
     </div>
   </div>
@@ -43,6 +39,39 @@
     <div *ngIf="loading" class="loading-state">
       <div class="spinner"></div>
       <p>جاري تحميل بيانات الحضور...</p>
+    </div>
+
+    <!-- Summary counts -->
+    <div *ngIf="selectedClassId && attendanceSummary.length > 0" class="summary-section">
+      <div class="summary-cards">
+        <div class="summary-card present">
+          <div class="summary-icon">
+            <i class="fas fa-user-check"></i>
+          </div>
+          <div class="summary-info">
+            <h4>الحاضرون</h4>
+            <span class="summary-count">{{presentCount}}</span>
+          </div>
+        </div>
+        <div class="summary-card absent">
+          <div class="summary-icon">
+            <i class="fas fa-user-times"></i>
+          </div>
+          <div class="summary-info">
+            <h4>الغائبون</h4>
+            <span class="summary-count">{{absentCount}}</span>
+          </div>
+        </div>
+        <div class="summary-card total">
+          <div class="summary-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="summary-info">
+            <h4>المجموع</h4>
+            <span class="summary-count">{{attendanceSummary.length}}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Table + actions -->
@@ -68,7 +97,7 @@
               <th>اسم الطالب</th>
               <th>الترقيم</th>
               <th>اسم الأب</th>
-              <th>الحالة في {{selectedDate}}</th>
+              <th>الحالة الحالية</th>
               <th>سجل الفترة</th>
             </tr>
           </thead>
@@ -79,8 +108,15 @@
                 <td>{{s.matricule}}</td>
                 <td>{{s.nomPere}}</td>
                 <td>
-                  <span *ngIf="isPresent(s.matricule)">حاضر</span>
-                  <span *ngIf="!isPresent(s.matricule)">غائب</span>
+                  <span 
+                    *ngIf="isStudentPresent(s.matricule)" 
+                    class="status-present">حاضر</span>
+                  <span 
+                    *ngIf="isStudentAbsent(s.matricule)" 
+                    class="status-absent">غائب</span>
+                  <span 
+                    *ngIf="isStudentUnknown(s.matricule)" 
+                    class="status-unknown">غير محدد</span>
                 </td>
                 <td>
                   <button class="btn" (click)="viewStudentAttendance(s)">
@@ -96,7 +132,7 @@
               <tr *ngIf="expandedStudentMatricule === s.matricule" colspan="5">
                 <td colspan="5">
                   <div *ngIf="(studentRecords[s.matricule] || []).length > 0">
-                    <h4>سجلات الحضور بين {{startDate}} و {{endDate}}</h4>
+                    <h4>سجلات الحضور ليوم {{selectedDate}}</h4>
                     <ul>
                       <li *ngFor="let r of (studentRecords[s.matricule] || [])">
                         <span class="record-time" [ngClass]="{'entry': r.camera === 'entry', 'exit': r.camera === 'exit'}">{{

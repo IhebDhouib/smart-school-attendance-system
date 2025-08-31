@@ -141,12 +141,94 @@ def listen_for_quit():
 listener_thread = threading.Thread(target=listen_for_quit, daemon=True)
 listener_thread.start()
 
+def fetch_saved_cameras():
+    """Récupère les caméras sauvegardées depuis la base de données"""
+    try:
+        response = requests.get(f"{BACKEND_URL}/api/cameras", timeout=10)
+        if response.status_code == 200:
+            cameras = response.json()
+            print(f"✅ {len(cameras)} caméra(s) récupérée(s) depuis la base de données")
+            return cameras
+        else:
+            print(f"❌ Erreur API caméras: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ Erreur lors de la récupération des caméras: {e}")
+        return []
+
+def build_camera_url(camera):
+    """Construit l'URL complète d'une caméra depuis les données de la DB"""
+    try:
+        ip = camera.get('ip')
+        port = camera.get('port', 8080)
+        username = camera.get('username', '')
+        password = camera.get('password', '')
+        
+        if not ip:
+            return None
+            
+        # Construire l'URL avec ou sans authentification
+        if username and password:
+            url = f"http://{username}:{password}@{ip}:{port}/video"
+        else:
+            url = f"http://{ip}:{port}/video"
+            
+        return url
+    except Exception as e:
+        print(f"❌ Erreur construction URL caméra: {e}")
+        return None
+
+def get_cameras_by_classroom(cameras, classroom_name=None):
+    """Filtre les caméras par classe ou retourne toutes si classroom_name est None"""
+    if not classroom_name:
+        return cameras
+    return [cam for cam in cameras if cam.get('classroom', '').lower() == classroom_name.lower()]
+
 def initialize_cameras():
-    """Initialise les caméras (IP puis locale) et retourne les objets cap pour l'entrée et la sortie"""
+    """Initialise les caméras (DB puis IP puis locale) et retourne les objets cap pour l'entrée et la sortie"""
+    
+    # 1. Essayer de récupérer les caméras sauvegardées
+    saved_cameras = fetch_saved_cameras()
+    
+    # 2. Préparer les sources de caméras
     camera_sources = {
-        "entry": ["http://192.168.1.66:8080/video", 1],
-        "exit": [0,"http://192.168.1.68:5001/video", 0]
+        "entry": [],
+        "exit": []
     }
+    
+    # 3. Ajouter les caméras sauvegardées (actives seulement)
+    active_cameras = [cam for cam in saved_cameras if cam.get('status') == 'active']
+    
+    for camera in active_cameras:
+        camera_url = build_camera_url(camera)
+        if camera_url:
+            camera_name = camera.get('name', 'Camera')
+            classroom = camera.get('classroom', '')
+            
+            # Associer les caméras selon le nom ou la classe
+            # Vous pouvez personnaliser cette logique selon vos besoins
+            if 'entry' in camera_name.lower() or 'entrée' in camera_name.lower():
+                camera_sources["entry"].append(camera_url)
+                print(f"📹 Caméra d'entrée ajoutée: {camera_name} ({camera_url})")
+            elif 'exit' in camera_name.lower() or 'sortie' in camera_name.lower():
+                camera_sources["exit"].append(camera_url)
+                print(f"📹 Caméra de sortie ajoutée: {camera_name} ({camera_url})")
+            else:
+                # Par défaut, ajouter aux caméras d'entrée si pas de classification claire
+                camera_sources["entry"].append(camera_url)
+                print(f"📹 Caméra ajoutée (entrée par défaut): {camera_name} ({camera_url})")
+    
+    # 4. Ajouter les caméras hardcodées/env comme fallback
+    camera_sources["entry"].extend([
+        os.getenv("ENTRY_CAMERA_1", "http://192.168.1.38:8080/video"),
+        int(os.getenv("ENTRY_CAMERA_2", "1"))
+    ])
+    
+    camera_sources["exit"].extend([
+        os.getenv("EXIT_CAMERA_1", "http://192.168.1.33:8080/video"),
+        int(os.getenv("EXIT_CAMERA_2", "0")),
+        int(os.getenv("EXIT_CAMERA_3", "0"))
+    ])
     
     caps = {}
     for cam_type, sources in camera_sources.items():

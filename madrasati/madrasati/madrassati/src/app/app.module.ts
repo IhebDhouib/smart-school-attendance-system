@@ -7,13 +7,14 @@ import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
 import { BrowserModule } from '@angular/platform-browser';
-import { TeacherComponent } from './teacher/teacher.component';
-import { FormsModule } from '@angular/forms';
 import { ClassroomComponent } from './classroom/classroom.component';
 import { StudentComponent } from './student/student.component';
-import { ScheduleUploadComponent } from './schedule-upload/schedule-upload.component';
 import { AttendanceComponent } from './attendance/attendance.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
+import { CameraComponent } from './camera/camera.component';
+import { CameraFeedComponent } from './camera-feed/camera-feed.component';
+import { UnknownFacesComponent } from './unknown-faces/unknown-faces.component';
+import { FormsModule } from '@angular/forms';
 @NgModule({
   declarations: [
     AppComponent,
@@ -22,17 +23,17 @@ import { DashboardComponent } from './dashboard/dashboard.component';
     RegisterComponent,
     ClassroomComponent,
     StudentComponent,
-    ScheduleUploadComponent,
     AttendanceComponent,
-    DashboardComponent
+    DashboardComponent,
+    CameraComponent,
+    CameraFeedComponent,
+    UnknownFacesComponent
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     HttpClientModule,
-    FormsModule, // ✅ Required for ngModel
-
-    TeacherComponent // ✅ Proper way for standalone component
+    FormsModule // ✅ Required for ngModel
   ],
   providers: [
     {

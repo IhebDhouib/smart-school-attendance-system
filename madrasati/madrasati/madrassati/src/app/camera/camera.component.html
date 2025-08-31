@@ -1,0 +1,181 @@
+<div class="camera-container">
+  <div class="main-content">
+    <!-- Header -->
+    <div class="page-header">
+      <h2><i class="fas fa-video"></i> إدارة الكاميرات</h2>
+      <p>إضافة وإدارة كاميرات المراقبة في المدرسة</p>
+    </div>
+
+    <!-- Camera Form -->
+    <div class="form-section">
+      <div class="section-header">
+        <h3><i class="fas fa-plus-circle"></i> {{ isEditing ? 'تعديل الكاميرا' : 'إضافة كاميرا جديدة' }}</h3>
+      </div>
+
+      <form class="camera-form" (ngSubmit)="isEditing ? updateCamera() : addCamera()">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="cameraName">اسم الكاميرا *</label>
+            <input 
+              id="cameraName"
+              type="text" 
+              [(ngModel)]="newCamera.name" 
+              name="name" 
+              placeholder="مثال: كاميرا الصف الأول"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label for="cameraIp">عنوان IP *</label>
+            <input 
+              id="cameraIp"
+              type="text" 
+              [(ngModel)]="newCamera.ip" 
+              name="ip" 
+              placeholder="192.168.1.100"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label for="cameraPort">المنفذ</label>
+            <input 
+              id="cameraPort"
+              type="number" 
+              [(ngModel)]="newCamera.port" 
+              name="port" 
+              placeholder="8080">
+          </div>
+
+          <div class="form-group">
+            <label for="cameraClassroom">الصف المرتبط</label>
+            <input 
+              id="cameraClassroom"
+              type="text" 
+              [(ngModel)]="newCamera.classroom" 
+              name="classroom" 
+              placeholder="الصف الأول أ">
+          </div>
+
+          <div class="form-group">
+            <label for="cameraType">نوع الكاميرا *</label>
+            <select 
+              id="cameraType"
+              [(ngModel)]="newCamera.type" 
+              name="type" 
+              required>
+              <option value="entry">دخول</option>
+              <option value="exit">خروج</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="cameraUsername">اسم المستخدم</label>
+            <input 
+              id="cameraUsername"
+              type="text" 
+              [(ngModel)]="newCamera.username" 
+              name="username" 
+              placeholder="admin">
+          </div>
+
+          <div class="form-group">
+            <label for="cameraPassword">كلمة المرور</label>
+            <input 
+              id="cameraPassword"
+              type="password" 
+              [(ngModel)]="newCamera.password" 
+              name="password" 
+              placeholder="••••••••">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">
+            <i class="fas fa-save"></i>
+            {{ isEditing ? 'تحديث الكاميرا' : 'إضافة الكاميرا' }}
+          </button>
+          
+          <button type="button" class="btn-secondary" (click)="resetForm()" *ngIf="isEditing">
+            <i class="fas fa-times"></i>
+            إلغاء
+          </button>
+
+          <button type="button" class="btn-info" (click)="testConnection(newCamera)" [disabled]="isTestingConnection || !newCamera.ip">
+            <i class="fas fa-wifi" *ngIf="!isTestingConnection"></i>
+            <i class="fas fa-spinner fa-spin" *ngIf="isTestingConnection"></i>
+            {{ isTestingConnection ? 'جار الاختبار...' : 'اختبار الاتصال' }}
+          </button>
+        </div>
+
+        <!-- Test Result -->
+        <div class="test-result" *ngIf="showTestResult" [class.success]="testResult.includes('نجاح')" [class.error]="!testResult.includes('نجاح')">
+          <i class="fas fa-check-circle" *ngIf="testResult.includes('نجاح')"></i>
+          <i class="fas fa-exclamation-triangle" *ngIf="!testResult.includes('نجاح')"></i>
+          {{ testResult }}
+        </div>
+      </form>
+    </div>
+
+    <!-- Cameras List -->
+    <div class="list-section">
+      <div class="section-header">
+        <h3><i class="fas fa-list"></i> قائمة الكاميرات</h3>
+        <span class="badge">{{ cameras.length }} كاميرا</span>
+      </div>
+
+      <div class="cameras-grid" *ngIf="cameras.length > 0">
+        <div class="camera-card" *ngFor="let camera of cameras">
+          <div class="camera-header">
+            <h4>{{ camera.name }}</h4>
+            <span class="status-badge" [ngClass]="getStatusClass(camera.status)">
+              <i class="fas fa-circle"></i>
+              {{ camera.status === 'active' ? 'نشطة' : camera.status === 'inactive' ? 'غير نشطة' : 'خطأ' }}
+            </span>
+          </div>
+
+          <div class="camera-details">
+            <div class="detail-item">
+              <i class="fas fa-network-wired"></i>
+              <span>{{ camera.ip }}:{{ camera.port }}</span>
+            </div>
+            
+            <div class="detail-item">
+              <i class="fas fa-{{ camera.type === 'entry' ? 'sign-in-alt' : 'sign-out-alt' }}"></i>
+              <span>{{ camera.type === 'entry' ? 'دخول' : 'خروج' }}</span>
+            </div>
+            
+            <div class="detail-item" *ngIf="camera.classroom">
+              <i class="fas fa-door-open"></i>
+              <span>{{ camera.classroom }}</span>
+            </div>
+            
+            <div class="detail-item" *ngIf="camera.username">
+              <i class="fas fa-user"></i>
+              <span>{{ camera.username }}</span>
+            </div>
+          </div>
+
+          <div class="camera-actions">
+            <button class="btn-sm btn-info" (click)="testConnection(camera)">
+              <i class="fas fa-wifi"></i>
+            </button>
+            
+            <button class="btn-sm btn-warning" (click)="editCamera(camera)">
+              <i class="fas fa-edit"></i>
+            </button>
+            
+            <button class="btn-sm btn-danger" (click)="deleteCamera(camera._id!)">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="cameras.length === 0">
+        <i class="fas fa-video-slash"></i>
+        <h3>لا توجد كاميرات</h3>
+        <p>لم يتم إضافة أي كاميرا بعد. قم بإضافة كاميرا جديدة باستخدام النموذج أعلاه.</p>
+      </div>
+    </div>
+  </div>
+</div>

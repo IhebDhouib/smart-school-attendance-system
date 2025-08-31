@@ -17,18 +17,19 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY face/requirements.txt ./
+# Copy requirements for face-api
+COPY face/requirements-face-api.txt ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-face-api.txt
 
 # Copy face service files
 COPY face/ .
 
 # Create necessary directories
-RUN mkdir -p dataset unknown_faces logs
+RUN mkdir -p dataset unknown_faces logs encodings
 
+# Copy the existing encodings file for initialization
 COPY face/encodings.pkl ./encodings.pkl
 
 # Set permissions
@@ -36,5 +37,7 @@ RUN chmod +x *.py
 
 EXPOSE 8000
 
-CMD ["uvicorn", "faceapi:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set Python path and run
+ENV PYTHONPATH=/app
+CMD ["sh", "-c", "mkdir -p /app/encodings && cp -f /app/encodings.pkl /app/encodings/encodings.pkl && python -m uvicorn faceapi:app --host 0.0.0.0 --port 8000"]
 

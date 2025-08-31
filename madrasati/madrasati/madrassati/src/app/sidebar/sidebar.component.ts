@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation, Output, EventEmitter } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -12,6 +12,8 @@ import { AuthService } from 'src/services/auth.service';
   encapsulation:ViewEncapsulation.None
 })
 export class SidebarComponent implements OnInit, OnDestroy {
+  @Output() collapsedChange = new EventEmitter<boolean>();
+  
   isCollapsed = false;
   isMobile = false;
   userCount = 24;
@@ -33,10 +35,16 @@ export class SidebarComponent implements OnInit, OnDestroy {
       if (this.isMobile) {
         this.isCollapsed = true;
       }
-      if (!this.isMobile) {
-        const savedState = localStorage.getItem('sidebarCollapsed');
-        this.isCollapsed = savedState === 'true';
-      }
+      
+      // Add small delay to prevent flicker on page refresh
+      setTimeout(() => {
+        if (!this.isMobile) {
+          const savedState = localStorage.getItem('sidebarCollapsed');
+          this.isCollapsed = savedState === 'true';
+        }
+        this.collapsedChange.emit(this.isCollapsed);
+      }, 50);
+      
       this.setupRouterSubscription();
     }
   }
@@ -78,6 +86,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   checkScreenSize() {
     if (isPlatformBrowser(this.platformId)) {
       const wasMobile = this.isMobile;
+      const wasCollapsed = this.isCollapsed;
       this.isMobile = window.innerWidth <= 768;
       if (wasMobile && !this.isMobile) {
         const savedState = localStorage.getItem('sidebarCollapsed');
@@ -85,6 +94,10 @@ export class SidebarComponent implements OnInit, OnDestroy {
       }
       if (!wasMobile && this.isMobile) {
         this.isCollapsed = true;
+      }
+      // Emit if collapsed state changed
+      if (wasCollapsed !== this.isCollapsed) {
+        this.collapsedChange.emit(this.isCollapsed);
       }
     }
   }
@@ -94,6 +107,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     if (!this.isMobile && isPlatformBrowser(this.platformId)) {
       localStorage.setItem('sidebarCollapsed', this.isCollapsed.toString());
     }
+    this.collapsedChange.emit(this.isCollapsed);
     this.provideFeedback();
   }
 

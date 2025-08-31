@@ -3,24 +3,27 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better caching
 COPY backend/package*.json ./
 
-# Install dependencies
-RUN npm ci 
+# Configure npm and install dependencies
+RUN npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retries 5 && \
+    npm install 
 
-# Copy source code
-COPY backend/ .
+# Copy the entire backend directory
+COPY backend/ ./
 
-# Create uploads directory
+# Verify files are copied
+RUN ls -la /app/
+
+# Create uploads directory with proper permissions
 RUN mkdir -p uploads logs
-
-# Set permissions
-RUN chown -R node:node /app
-
-USER node
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Override the default entrypoint and use exec form
+ENTRYPOINT []
+CMD ["node", "server.js"]
 

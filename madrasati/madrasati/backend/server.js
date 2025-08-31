@@ -3,13 +3,12 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { WebSocketServer } = require("ws");
 const winston = require("winston");
-const teacherRoutes = require("./routes/teacherRoutes");
 const authRoutes = require("./routes/authRoutes");
 const classRoutes = require("./routes/classroom");
 const studentRoutes = require("./routes/student");
-const scheduleRoutes = require("./routes/schedules");
 const attendanceRoutes = require("./routes/attendance");
 const faceEncodingRoutes = require("./routes/face-encoding");
+const cameraRoutes = require("./routes/camera");
 const Attendance = require("./models/Attendance");
 const Student = require("./models/Student");
 const Classroom = require("./models/Classroom"); // Ensure Classroom is imported
@@ -30,22 +29,61 @@ const logger = winston.createLogger({
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true, // Allow all origins
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from uploads directory with CORS headers
+app.use("/uploads", cors(), express.static("uploads"));
+
+// Test endpoint to check photo display
+app.get("/test-photo", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Photo Test</title></head>
+    <body>
+      <h1>Photo Display Test</h1>
+      <h2>Absolute URL:</h2>
+      <img src="http://localhost:3000/uploads/1756078201070-122937191.jpg" style="max-width: 200px;" />
+      <h2>Relative URL:</h2>
+      <img src="/uploads/1756078201070-122937191.jpg" style="max-width: 200px;" />
+      <h2>API Response Test:</h2>
+      <div id="api-test"></div>
+      <script>
+        fetch('/api/students')
+          .then(r => r.json())
+          .then(students => {
+            const withPhotos = students.filter(s => s.photos && s.photos.length > 0);
+            const html = withPhotos.map(s => 
+              '<p>' + s.fullName + ': <img src="' + s.photos[0] + '" style="max-width: 100px;" /></p>'
+            ).join('');
+            document.getElementById('api-test').innerHTML = html;
+          });
+      </script>
+    </body>
+    </html>
+  `);
+});
+
 // Routes
-app.use("/api/teachers", teacherRoutes);
 app.use("/api/classrooms", classRoutes);
 app.use("/api/students", studentRoutes);
-app.use("/api/schedules", scheduleRoutes); // Kept for compatibility, but not used in WebSocket
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/face-encoding", faceEncodingRoutes);
+app.use("/api/cameras", cameraRoutes);
 app.use("/api/auth", authRoutes);
 
 // MongoDB Connection
 mongoose
-  .connect("mongodb://mongodb:27017/madrasati", {
+  .connect(process.env.MONGODB_URI || "mongodb://mongodb:27017/madrasati", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
@@ -60,9 +98,18 @@ mongoose
 // WebSocket Server
 const wss = new WebSocketServer({ port: 3001 });
 
+// Store all connected WebSocket clients
+const connectedClients = new Set();
+
 wss.on("connection", (ws, req) => {
   const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  logger.info("WebSocket client connected", { clientIp });
+  logger.info("WebSocket client connected", {
+    clientIp,
+    totalClients: connectedClients.size + 1,
+  });
+
+  // Add client to the set
+  connectedClients.add(ws);
 
   ws.on("message", async (message) => {
     try {
@@ -140,10 +187,28 @@ wss.on("connection", (ws, req) => {
         return;
       }
 
-      // Check for duplicate attendance
+      // Check for duplicate attendance (within last 30 seconds)
+      const thirtySecondsAgo = new Date(date.getTime() - 30000);
+      const existingAttendance = await Attendance.findOne({
+        studentId: studentId,
+        timestamp: { $gte: thirtySecondsAgo, $lte: date },
+      });
 
-
-
+      if (existingAttendance) {
+        logger.debug("Duplicate attendance detected, skipping", {
+          studentId,
+          existingTimestamp: existingAttendance.timestamp,
+          newTimestamp: date,
+          clientIp,
+        });
+        ws.send(
+          JSON.stringify({
+            message: "Duplicate attendance detected, skipped",
+            studentId,
+          })
+        );
+        return;
+      }
 
       // Save attendance
       const attendance = new Attendance({
@@ -161,14 +226,44 @@ wss.on("connection", (ws, req) => {
         camera_type,
       });
 
+      // Send confirmation to the sender
       ws.send(
         JSON.stringify({
+          success: true,
           message: `Attendance recorded for student ${studentId}`,
           studentName: student.fullName,
           className: classroom.name,
           timestamp,
         })
       );
+
+      // Broadcast to all connected clients for real-time updates
+      const broadcastData = {
+        type: "attendance_update",
+        studentId,
+        studentName: student.fullName,
+        classId: classId.toString(),
+        className: classroom.name,
+        timestamp,
+        camera_type,
+      };
+
+      connectedClients.forEach((client) => {
+        if (client !== ws && client.readyState === client.OPEN) {
+          try {
+            client.send(JSON.stringify(broadcastData));
+            logger.debug("Broadcasted attendance update to client", {
+              studentId,
+              classId: classId.toString(),
+            });
+          } catch (err) {
+            logger.error("Error broadcasting to client", {
+              error: err.message,
+            });
+            connectedClients.delete(client);
+          }
+        }
+      });
     } catch (err) {
       logger.error("Error processing WebSocket message", {
         error: err.message,
@@ -182,7 +277,12 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", () => {
-    logger.info("WebSocket client disconnected", { clientIp });
+    logger.info("WebSocket client disconnected", {
+      clientIp,
+      totalClients: connectedClients.size - 1,
+    });
+    // Remove client from the set
+    connectedClients.delete(ws);
   });
 
   ws.on("error", (error) => {
@@ -191,6 +291,8 @@ wss.on("connection", (ws, req) => {
       stack: error.stack,
       clientIp,
     });
+    // Remove client from the set on error
+    connectedClients.delete(ws);
   });
 });
 

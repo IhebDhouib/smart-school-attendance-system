@@ -3,11 +3,20 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
+# Set npm configuration for better network handling
+RUN npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retries 10 && \
+    npm config set fetch-timeout 300000 && \
+    npm config set registry https://registry.npmjs.org/ && \
+    npm config set cache /tmp/.npm
+
 # Copy package files
 COPY madrasati/madrasati/madrassati/package*.json ./
 
-# Install ALL dependencies (not just production)
-RUN npm ci
+# Clear npm cache and install with retries
+RUN npm cache clean --force && \
+    npm install --no-audit --no-fund --legacy-peer-deps --maxsockets 1
 
 # Copy source code
 COPY madrasati/madrasati/madrassati/ .

@@ -36,6 +36,27 @@ const wss = new WebSocket.Server({ port: 3002 });
 
 logger.info("🚀 WebSocket server started on port 3002");
 
+// Store connected clients for broadcasting
+const connectedClients = new Set();
+
+// Helper function to broadcast to all connected clients
+function broadcastToClients(data) {
+  const message = JSON.stringify(data);
+  connectedClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(message);
+        logger.debug("Broadcasted message to client", { data });
+      } catch (error) {
+        logger.error("Error broadcasting to client", { error: error.message });
+        connectedClients.delete(client);
+      }
+    } else {
+      connectedClients.delete(client);
+    }
+  });
+}
+
 // Helper function to find student by matricule
 async function findStudentByMatricule(matricule) {
   try {
@@ -52,7 +73,10 @@ async function findStudentByMatricule(matricule) {
 
 wss.on("connection", (ws, req) => {
   const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  logger.info("📱 Face recognition client connected", { clientIp });
+  logger.info("📱 Client connected", { clientIp });
+
+  // Add client to connected clients set
+  connectedClients.add(ws);
 
   ws.on("message", async (message) => {
     try {
@@ -169,6 +193,32 @@ wss.on("connection", (ws, req) => {
         clientIp,
       });
 
+      // Broadcast attendance record update to all clients
+      broadcastToClients({
+        type: "attendance_record",
+        data: {
+          attendanceId: attendance._id,
+          studentId: studentId,
+          studentName: student.fullName,
+          studentMatricule: student.matricule,
+          classId: classId.toString(),
+          className: classroom.name,
+          timestamp: attendanceTime,
+        },
+      });
+
+      // Broadcast status update to all clients
+      broadcastToClients({
+        type: "status_update",
+        data: {
+          classId: classId.toString(),
+          studentId: studentId,
+          studentName: student.fullName,
+          isPresent: true,
+          timestamp: attendanceTime,
+        },
+      });
+
       ws.send(
         JSON.stringify({
           message: `Attendance recorded for ${student.fullName}`,
@@ -190,7 +240,8 @@ wss.on("connection", (ws, req) => {
   });
 
   ws.on("close", () => {
-    logger.info("📱 Face recognition client disconnected", { clientIp });
+    logger.info("📱 Client disconnected", { clientIp });
+    connectedClients.delete(ws);
   });
 
   ws.on("error", (error) => {
@@ -199,6 +250,7 @@ wss.on("connection", (ws, req) => {
       stack: error.stack,
       clientIp,
     });
+    connectedClients.delete(ws);
   });
 });
 

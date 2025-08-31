@@ -123,7 +123,7 @@
               <td>{{ getClassroomName(student.classId) }}</td>
               <td>
                 <div class="photos">
-                  <img *ngFor="let p of student.photos" [src]="'http://backend:3000/' + p" alt="photo" />
+                  <img *ngFor="let p of student.photos" [src]="p" alt="photo" />
                 </div>
               </td>
               <td>

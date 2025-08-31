@@ -16,6 +16,25 @@ services:
     networks:
       - madrasati_network
 
+  # MongoDB Web Interface
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: madrasati_mongo_express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD:-madrasati123}
+      ME_CONFIG_MONGODB_URL: mongodb://admin:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ""
+      ME_CONFIG_BASICAUTH_PASSWORD: ""
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: true
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - madrasati_network
+
   # Node.js Backend
   backend:
     build:
@@ -30,8 +49,8 @@ services:
       MONGODB_URI: mongodb://admin:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati?authSource=admin
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
     volumes:
-      - backend_uploads:/app/uploads:Z
-      - backend_logs:/app/logs:Z
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
     ports:
       - "3000:3000"
       - "3001:3001"
@@ -40,40 +59,25 @@ services:
     networks:
       - madrasati_network
 
-  face-api:
+  face-fused:
     build:
-      context: ../madrasati
-      dockerfile: ../docker-setup/Dockerfile.face-api
-    container_name: madrasati_face_api
-    restart: unless-stopped
-    environment:
-      PYTHONUNBUFFERED: 1
-
-    ports:
-      - "8000:8000"
-    networks:
-      - madrasati_network
-
-  # Python Face Detection Server
-  face-detection:
-    build:
-      context: ../../
-      dockerfile: madrasati/docker-setup/Dockerfile.face-detection
-    container_name: madrasati_face_detection
+      context: ../
+      dockerfile: docker-setup/Dockerfile.face-fused
+    container_name: madrasati_face_fused
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
       BACKEND_URL: http://backend:3000
       WEBSOCKET_URL: ws://backend:3001
-      ENTRY_CAMERA_1: ${ENTRY_CAMERA_1:-http://192.168.1.66:8080/video}
-      ENTRY_CAMERA_2: ${ENTRY_CAMERA_2:-1}
-      EXIT_CAMERA_1: ${EXIT_CAMERA_1:-0}
-      EXIT_CAMERA_2: ${EXIT_CAMERA_2:-http://192.168.1.68:5001/video}
-      EXIT_CAMERA_3: ${EXIT_CAMERA_3:-0}
-
+      
+    volumes:
+      - face_encodings:/app/encodings
+      - face_unknown:/app/unknown_faces
+    ports:
+      - "8000:8000"
+      - "5001:5001"
     depends_on:
       - backend
-      - face-api
     networks:
       - madrasati_network
     privileged: true
@@ -88,9 +92,6 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-    volumes:
-      - .:/app
-      - /app/node_modules
 
     depends_on:
       - backend
@@ -99,6 +100,10 @@ services:
 
 volumes:
   mongodb_data:
+    driver: local
+  face_encodings:
+    driver: local
+  face_unknown:
     driver: local
   backend_uploads:
     driver: local
