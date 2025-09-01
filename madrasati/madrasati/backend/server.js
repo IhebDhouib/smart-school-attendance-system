@@ -83,7 +83,7 @@ app.use("/api/auth", authRoutes);
 
 // MongoDB Connection
 mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://mongodb:27017/madrasati", {
+  .connect(process.env.MONGODB_URI || "mongodb://madrasati_user:madrasati123@mongodb:27017/madrasati", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })

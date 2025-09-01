@@ -33,6 +33,9 @@ COPY docker-setup/unknown_faces_api_fastapi.py .
 # Create necessary directories
 RUN mkdir -p dataset unknown_faces logs encodings
 
+# Copy encodings.pkl if it exists to the encodings directory
+RUN if [ -f "./face/encodings.pkl" ]; then cp ./face/encodings.pkl ./encodings/encodings.pkl; fi
+
 # Set permissions
 RUN chmod +x *.py
 

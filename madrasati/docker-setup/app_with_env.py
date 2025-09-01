@@ -154,6 +154,9 @@ os.makedirs(UNKNOWN_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 # 🧠 Charger les encodages connus
+known_encodings = []
+known_names = []
+
 try:
     with open(ENCODINGS_FILE, "rb") as f:
         data = pickle.load(f)
@@ -161,9 +164,12 @@ try:
         known_names = data["names"]
     validation_stats = validate_encodings(verbose=True)
     if not validation_stats['valid']:
-        print("❌ Encodages non valides. Exécutez encode_faces_copy.py.")
-        exit(1)
-    print(f"✅ {len(known_encodings)} encodages chargés pour {validation_stats['unique_persons']} personnes.")
+        print("⚠️  Encodages non valides ou vides. Le système démarrera en mode attente.")
+        print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages.")
+        known_encodings = []
+        known_names = []
+    else:
+        print(f"✅ {len(known_encodings)} encodages chargés pour {validation_stats['unique_persons']} personnes.")
 
     # Validate encodings against database and auto-sync if needed
     try:
@@ -196,11 +202,15 @@ try:
     except Exception as e:
         print(f"⚠️  Erreur validation DB: {e}")
 except FileNotFoundError:
-    print("❌ Fichier encodings.pkl non trouvé. Exécutez d'abord encode_faces_copy.py.")
-    exit(1)
+    print("⚠️  Fichier encodings.pkl non trouvé. Le système démarrera en mode attente.")
+    print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages automatiquement.")
+    known_encodings = []
+    known_names = []
 except Exception as e:
-    print(f"❌ Erreur lors du chargement des encodages: {e}")
-    exit(1)
+    print(f"⚠️  Erreur lors du chargement des encodages: {e}")
+    print("💡 Le système démarrera avec des encodages vides.")
+    known_encodings = []
+    known_names = []
 
 # 📝 Variables de suivi
 presence = {}
@@ -468,15 +478,32 @@ def process_frame(frame, camera_type):
     """Traite une frame pour la reconnaissance faciale"""
     global frame_count
     frame_count += 1
+    
     # Redimensionner pour améliorer les performances
     small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
     rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+    
     # Détecter les visages
     face_locations = face_recognition.face_locations(rgb_small_frame)
     face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+    
     with encodings_lock:
         current_encodings = known_encodings
         current_names = known_names
+    
+    # Si aucun encodage n'est disponible, sauvegarder les visages comme inconnus
+    if not current_encodings:
+        if face_locations and frame_count % 30 == 0:  # Sauvegarder seulement toutes les 30 frames
+            for face_location in face_locations:
+                # Ajuster les coordonnées pour la frame originale
+                top, right, bottom, left = face_location
+                top *= 4
+                right *= 4
+                bottom *= 4
+                left *= 4
+                save_unknown_face(frame, (top, right, bottom, left))
+        return
+    
     for face_encoding, face_location in zip(face_encodings, face_locations):
         # Comparer avec les visages connus
         matches = face_recognition.compare_faces(current_encodings, face_encoding, tolerance=0.6)
@@ -511,12 +538,34 @@ def main():
     # Établir la connexion WebSocket
     connect_websocket()
     
+    # Check if we have encodings
+    if not known_encodings:
+        print("⚠️  Aucun encodage disponible. Le système fonctionnera en mode détection seulement.")
+        print("💡 Les visages détectés seront sauvegardés comme inconnus.")
+    
     # Initialiser les caméras
     caps = initialize_cameras()
     
     if not caps:
-        print("❌ Aucune caméra disponible. Arrêt du programme.")
-        return
+        print("⚠️  Aucune caméra disponible. Le système continuera en mode API seulement.")
+        print("💡 Vous pouvez ajouter des étudiants via l'interface web.")
+        
+        # Wait indefinitely to keep the container running for API access
+        try:
+            while not shutdown_event.is_set():
+                time.sleep(10)
+                # Check for new encodings periodically
+                if not known_encodings:
+                    new_encodings, new_names = load_encodings()
+                    if new_encodings:
+                        print("✅ Nouveaux encodages détectés! Tentative de démarrage des caméras...")
+                        caps = initialize_cameras()
+                        if caps:
+                            break
+        except KeyboardInterrupt:
+            print("\n🛑 Arrêt par Ctrl+C")
+            shutdown_event.set()
+            return
     
     print("🎥 Démarrage de la reconnaissance faciale...")
     print("💡 Tapez 'q' ou 'quit' pour arrêter le programme")

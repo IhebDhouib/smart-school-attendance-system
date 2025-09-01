@@ -1,15 +1,50 @@
+/* Container principal avec centrage */
+.classroom-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  background: #f4f6f8;
+  min-height: 100vh;
+}
+
+/* Header professionnel */
+.professional-header {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+  color: white;
+  padding: 40px 20px;
+  margin: -2rem -2rem 2rem -2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+  border-radius: 0 0 20px 20px;
+}
+
+.professional-header h1 {
+  font-size: 2.8rem;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.professional-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+  margin: 0;
+  font-weight: 300;
+}
+
 .classroom-box {
-  max-width: 600px;
+  max-width: 800px;
   margin: auto;
-  background-color: #f8faff;
+  background-color: #ffffff;
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .classroom-box h2 {
-  color: #2b5dab;
+  color: #2563eb;
   margin-bottom: 1rem;
   text-align: center;
 }
@@ -42,18 +77,21 @@
 }
 
 .classroom-box button {
-  background-color: #2b5dab;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
   color: white;
   padding: 0.6rem;
   border: none;
   border-radius: 8px;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
 .classroom-box button:hover {
-  background-color: #1f4680;
+  background: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .classroom-box ul {
@@ -62,13 +100,15 @@
 }
 
 .classroom-box li {
-  background-color: #e8f0fe;
+  background: #dbeafe;
   margin-bottom: 0.5rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-left: 4px solid #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
 }
 
 .classroom-box li button {

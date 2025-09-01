@@ -46,7 +46,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       WEBSOCKET_PORT: 3001
-      MONGODB_URI: mongodb://admin:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati?authSource=admin
+      MONGODB_URI: mongodb://madrasati_user:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
     volumes:
       - backend_uploads:/app/uploads

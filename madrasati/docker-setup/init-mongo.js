@@ -1,6 +1,18 @@
 // MongoDB initialization script for Madrasati
 db = db.getSiblingDB("madrasati");
 
+// Create a user for the madrasati database
+db.createUser({
+  user: "madrasati_user",
+  pwd: "madrasati123",
+  roles: [
+    {
+      role: "readWrite",
+      db: "madrasati"
+    }
+  ]
+});
+
 // Create collections
 db.createCollection("users");
 db.createCollection("students");
