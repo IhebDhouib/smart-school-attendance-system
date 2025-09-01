@@ -145,26 +145,52 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.logo i {
-  font-size: 2.2rem;
-  min-width: 36px;
-  text-align: center;
-  display: inline-block;
-  background: linear-gradient(135deg, var(--accent-color), var(--secondary-color));
+.logo-image {
+  width: 50px;
+  height: 40px;
+  border-radius: 12px;
+  min-width: 40px;
+  object-fit: cover;
+  background-color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all var(--transition-normal);
+}
+
+.logo-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.logo-text {
+  font-family: 'Cairo', 'Segoe UI', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-}
-
-.logo span {
+  text-shadow: none;
+  letter-spacing: 0.5px;
   transition: opacity var(--transition-normal), width var(--transition-normal);
 }
 
-.sidebar.collapsed .logo span {
+.sidebar.collapsed .logo-text {
   opacity: 0;
   width: 0;
   overflow: hidden;
+}
+
+/* Style du logo quand la sidebar est réduite */
+.sidebar.collapsed .logo {
+  justify-content: center;
+  gap: 0;
+}
+
+.sidebar.collapsed .logo-image {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
 }
 
 .close-sidebar {
@@ -328,29 +354,108 @@
 /* Sidebar Footer */
 .sidebar-footer {
   padding: 1.5rem 1rem;
-  border-top: 1px solid var(--border-color);
-  background: var(--sidebar-header-bg);
+  border-top: 1px solid rgba(37, 99, 235, 0.2);
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  margin-top: auto;
+  position: relative;
+}
+
+.sidebar-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 1rem;
+  right: 1rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%);
 }
 
 .logout-btn {
   width: 100%;
   justify-content: flex-start;
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%) !important;
+  color: white !important;
+  border: none;
+  margin-top: auto;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.logout-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
+}
+
+.logout-btn:hover::before {
+  opacity: 1;
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.logout-btn i,
+.logout-btn span {
+  position: relative;
+  z-index: 1;
+}
+
+.logout-btn i {
+  font-size: 1.2rem;
+  margin-right: 0.75rem;
+}
+
+.logout-btn span {
+  font-weight: 600;
+  font-size: 1rem;
 }
 
 .sidebar.collapsed .logout-btn {
   justify-content: center;
-  padding: 0.875rem;
+  padding: 1rem;
+  margin: 0 0.5rem;
+  border-radius: 50%;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.sidebar.collapsed .logout-btn:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
 }
 
 .sidebar.collapsed .logout-btn i {
   margin: 0 auto;
-  display: inline-block; /* Ensure visibility */
+  display: inline-block;
+  font-size: 1.3rem;
+  color: white;
 }
 
 .sidebar.collapsed .logout-btn span {
   opacity: 0;
   width: 0;
   overflow: hidden;
+  position: absolute;
 }
 
 /* Tooltips for Collapsed State */
@@ -445,10 +550,15 @@
 /* Accessibility */
 .sidebar-toggle:focus,
 .nav-link:focus,
-.logout-btn:focus,
 .close-sidebar:focus {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
+}
+
+.logout-btn:focus {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4), 0 0 0 3px rgba(251, 191, 36, 0.3);
 }
 
 /* Screen Reader Only */

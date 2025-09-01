@@ -14,8 +14,8 @@
   <!-- Header -->
   <div class="sidebar-header">
     <div class="logo">
-      <i class="fas fa-school" aria-hidden="true"></i>
-      <span>Madrasati</span>
+      <img src="assets/image/wassim.png" alt="Logo" class="logo-image">
+      <span class="logo-text">حضوري</span>
     </div>
     <button class="close-sidebar" 
             (click)="toggleSidebar()" 
@@ -43,11 +43,11 @@
         <a routerLink="/student" 
            class="nav-link" 
            routerLinkActive="active"
-           data-tooltip="الطلاب"
+           data-tooltip="التلاميذ"
            (click)="onNavClick()"
            role="menuitem">
           <i class="fas fa-user-graduate" aria-hidden="true"></i>
-          <span>الطلاب</span>
+          <span>التلاميذ</span>
         </a>
       </li>
       <li class="nav-item" role="listitem">

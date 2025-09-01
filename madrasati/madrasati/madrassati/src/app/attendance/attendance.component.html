@@ -1,10 +1,17 @@
 <div class="sidebar-adaptive-container">
   <div class="attendance-container">
-  <div class="header-section">
-    <h2 class="page-title"><i class="fas fa-calendar-check"></i> إدارة الحضور</h2>
-  </div>
+    <!-- Header professionnel uniforme -->
+    <div class="professional-header">
+      <h1>
+        <i class="fas fa-calendar-check"></i> 
+        إدارة الحضور
+      </h1>
+      <p>متابعة وإدارة حضور التلاميذ في النظام</p>
+    </div>
 
-  <div class="filters-section">
+    <div class="main-content">
+
+      <div class="filters-section">
     <div class="filter-group">
       <label for="classSelect">الفئة :</label>
       <select id="classSelect" [(ngModel)]="selectedClassId" (change)="onClassChange()" class="form-select">
@@ -78,11 +85,11 @@
     <!-- Table + actions -->
     <div *ngIf="students.length > 0" class="table-section">
       <div class="table-header">
-        <h3>قائمة الطلاب</h3>
+        <h3>قائمة التلاميذ</h3>
         <div class="table-actions">
           <div class="search-box">
             <i class="fas fa-search"></i>
-            <input type="text" placeholder="ابحث عن طالب..." [(ngModel)]="searchTerm" (input)="filterStudents()"
+            <input type="text" placeholder="ابحث عن تلميذ..." [(ngModel)]="searchTerm" (input)="filterStudents()"
               class="search-input" />
           </div>
           <button class="btn btn-export" (click)="exportToCSV()">
@@ -95,7 +102,7 @@
         <table class="attendance-table">
           <thead>
             <tr>
-              <th>اسم الطالب</th>
+              <th>اسم التلميذ</th>
               <th>الترقيم</th>
               <th>اسم الأب</th>
               <th>الحالة الحالية</th>
@@ -178,6 +185,7 @@
     <div *ngIf="students.length === 0 && selectedClassId && !loading" class="empty-state">
       <div class="empty-icon"><i class="fas fa-user-slash"></i></div>
       <h3>لا توجد بيانات طلاب لهذه الفئة</h3>
+    </div>
     </div>
   </div>
 </div>

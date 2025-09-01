@@ -1,0 +1,37 @@
+/* Style pour AGRANDIR BEAUCOUP le favicon */
+link[rel="icon"] {
+  width: 48px !important;
+  height: 48px !important;
+  transform: scale(1.5) !important;
+}
+
+link[rel="shortcut icon"] {
+  width: 48px !important;
+  height: 48px !important;
+  transform: scale(1.5) !important;
+}
+
+/* Force l'affichage en TRÈS HAUTE résolution */
+@media (min-resolution: 2dppx) {
+  link[rel="icon"] {
+    width: 96px !important;
+    height: 96px !important;
+    transform: scale(2) !important;
+  }
+}
+
+/* Force le favicon à apparaître plus grand dans tous les navigateurs */
+head link[rel*="icon"] {
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  min-height: 64px !important;
+}
+
+/* Style spécial pour Chrome et Firefox */
+@supports (-webkit-appearance: none) {
+  link[rel="icon"] {
+    width: 80px !important;
+    height: 80px !important;
+  }
+}

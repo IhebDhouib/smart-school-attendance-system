@@ -1,13 +1,13 @@
 <div class="sidebar-adaptive-container">
-  <div class="student-management-container">
-  <!-- Header professionnel -->
-  <div class="professional-header">
-    <h1><i class="fas fa-user-graduate"></i> إدارة الطلاب</h1>
-    <p>نظام شامل لإدارة بيانات الطلاب والحضور</p>
-  </div>
+  <div class="student-container">
+    <!-- Header Section -->
+    <div class="professional-header">
+      <h1><i class="fas fa-user-graduate"></i> إدارة التلاميذ</h1>
+      <p>نظام شامل لإدارة بيانات التلاميذ والحضور</p>
+    </div>
 
   <div class="student-import">
-    <h3><i class="fas fa-file-excel"></i> استيراد الطلاب عبر Excel</h3>
+    <h3><i class="fas fa-file-excel"></i> استيراد التلاميذ عبر Excel</h3>
     <div class="import-controls">
       <input 
         type="file" 
@@ -24,7 +24,7 @@
     <div class="student-form">
       <h2>
         <i class="fas fa-user-graduate"></i>
-        {{ isEditing ? 'تعديل طالب' : 'إضافة طالب' }}
+        {{ isEditing ? 'تعديل تلميذ' : 'إضافة تلميذ' }}
       </h2>
 
       <div class="student-grid">
@@ -76,7 +76,7 @@
     </div>
 
     <div class="filters">
-      <h3><i class="fas fa-filter"></i> تصفية الطلاب</h3>
+      <h3><i class="fas fa-filter"></i> تصفية التلاميذ</h3>
       <div class="filter-grid">
         <div class="form-group">
           <label>البحث</label>
@@ -104,8 +104,8 @@
 
     <div class="student-list">
       <div class="list-header">
-        <h3><i class="fas fa-list-ol"></i> قائمة الطلاب</h3>
-        <span class="badge">{{ filteredStudents.length }} طالب (طلاب)</span>
+        <h3><i class="fas fa-list-ol"></i> قائمة التلاميذ</h3>
+        <span class="badge">{{ filteredStudents.length }} تلميذ</span>
       </div>
 
       <div class="table-container">
@@ -148,7 +148,7 @@
 
       <div *ngIf="filteredStudents.length === 0" class="empty-state">
         <i class="fas fa-user-slash"></i>
-        <p>لم يتم العثور على أي طالب بهذه المعايير.</p>
+        <p>لم يتم العثور على أي تلميذ بهذه المعايير.</p>
       </div>
     </div>
   </div>

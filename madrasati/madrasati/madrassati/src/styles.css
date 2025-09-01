@@ -1,23 +1,72 @@
 /* Styles globaux pour la gestion dynamique de la sidebar */
 
+/* Force reflow helper class */
+.force-reflow {
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+}
+
+/* Police par défaut pour l'arabe */
+* {
+  font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
 /* Classes utilitaires pour les marges de sidebar */
 .sidebar-adaptive-container {
   transition: margin-left 0.3s ease;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #f8fafc;
+  min-height: 100vh;
+  text-align: center;
+  transform: translateZ(0); /* Force hardware acceleration */
+  will-change: margin-left; /* Optimize for margin changes */
 }
 
-/* Quand la sidebar est visible et étendue */
+/* Gestion dynamique des marges selon l'état de la sidebar */
 .main-content:not(.full-width):not(.sidebar-collapsed) .sidebar-adaptive-container {
   margin-left: 280px;
 }
 
-/* Quand la sidebar est visible mais réduite */
 .main-content.sidebar-collapsed .sidebar-adaptive-container {
   margin-left: 80px;
 }
 
-/* Quand pas de sidebar (login/register) */
 .main-content.full-width .sidebar-adaptive-container {
   margin-left: 0;
+}
+
+/* Force la re-application des styles après changement de route */
+.main-content {
+  position: relative;
+  transition: all 0.3s ease;
+  width: 100%;
+  overflow-x: hidden; /* Évite les débordements horizontaux */
+}
+
+.main-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Force le recalcul CSS lors des changements de route */
+.main-content:not(.full-width):not(.sidebar-collapsed) {
+  transform: translateZ(0); /* Force l'accélération hardware */
+}
+
+.main-content.sidebar-collapsed {
+  transform: translateZ(0); /* Force l'accélération hardware */
+}
+
+.main-content.full-width {
+  transform: translateZ(0); /* Force l'accélération hardware */
 }
 
 /* Classes pour les containers de composants */

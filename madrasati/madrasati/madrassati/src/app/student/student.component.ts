@@ -1,14 +1,13 @@
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, ViewEncapsulation, ChangeDetectorRef, AfterViewInit } from '@angular/core';
 import { StudentService, Student, Classroom } from 'src/services/student.service';
 import { ClassroomService } from 'src/services/classroom.service';
 
 @Component({
   selector: 'app-student',
   templateUrl: './student.component.html',
-  styleUrls: ['./student.component.css'],
-  encapsulation:ViewEncapsulation.None
+  styleUrls: ['./student.component.css']
 })
-export class StudentComponent implements OnInit {
+export class StudentComponent implements OnInit, AfterViewInit {
   newStudent: Student = {
     matricule: '',
     fullName: '',
@@ -37,13 +36,32 @@ export class StudentComponent implements OnInit {
 
   constructor(
     private studentService: StudentService,
-    private classroomService: ClassroomService
+    private classroomService: ClassroomService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.getClassrooms();
     this.getStudents();
     this.generateBirthYears();
+  }
+
+  ngAfterViewInit() {
+    // Force le reflow initial pour assurer l'application correcte des styles
+    setTimeout(() => {
+      this.forceStyleReflow();
+    }, 100);
+  }
+
+  private forceStyleReflow() {
+    const container = document.querySelector('.sidebar-adaptive-container');
+    if (container) {
+      const htmlContainer = container as HTMLElement;
+      htmlContainer.style.transform = 'translateZ(0)';
+      htmlContainer.offsetHeight; // Trigger reflow
+      htmlContainer.style.transform = '';
+      this.cdr.detectChanges();
+    }
   }
 
   generateBirthYears() {

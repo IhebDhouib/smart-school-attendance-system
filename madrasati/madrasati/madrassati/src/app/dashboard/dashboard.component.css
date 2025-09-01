@@ -1,12 +1,8 @@
-/* Dashboard Container */
+/* Dashboard Container simplifié */
 .dashboard-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
-  background: #f8fafc;
-  min-height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  text-align: center;
+  color: #333;
+  /* Styles de base seulement - les dimensions sont gérées par .sidebar-adaptive-container */
 }
 
 /* Header Section */

@@ -1,12 +1,14 @@
 <div class="sidebar-adaptive-container">
   <div class="classroom-container">
-  <!-- Header professionnel -->
-  <div class="professional-header">
-    <h1><i class="fas fa-chalkboard-teacher"></i> إدارة الفصول الدراسية</h1>
-    <p>تنظيم وإدارة الفصول والمراحل التعليمية</p>
-  </div>
+    <!-- Header Section -->
+    <div class="professional-header">
+      <h1><i class="fas fa-chalkboard-teacher"></i> إدارة الفصول الدراسية</h1>
+      <p>تنظيم وإدارة الفصول والمراحل التعليمية</p>
+    </div>
 
-  <div class="classroom-box">
+    <div class="main-content">
+
+      <div class="classroom-box">
     <h2>إضافة فصل دراسي</h2>
     <form (submit)="addClassroom(); $event.preventDefault()">
       <label>اسم الفصل :</label>
@@ -28,5 +30,6 @@
       </li>
     </ul>
   </div>
-</div>
+    </div>
+  </div>
 </div>
