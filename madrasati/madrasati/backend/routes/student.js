@@ -119,7 +119,7 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
           form.append("photo", fs.createReadStream(photoPath));
 
           const response = await axios.post(
-            "http://face-api:8000/students/add",
+            "http://face-fused:8000/students/add",
             form,
             { headers: form.getHeaders() }
           );
@@ -165,7 +165,7 @@ router.delete("/:id", async (req, res) => {
     // 🔥 Call Python API to delete dataset + re-encode
     try {
       const response = await axios.delete(
-        `http://face-api:8000/students/${student.matricule}`
+        `http://face-fused:8000/students/${student.matricule}`
       );
       console.log("Face API Delete result:", response.data);
     } catch (err) {
@@ -216,7 +216,7 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
           form.append("photo", fs.createReadStream(photoPath));
 
           const response = await axios.post(
-            "http://face-api:8000/students/add",
+            "http://face-fused:8000/students/add",
             form,
             { headers: form.getHeaders() }
           );
