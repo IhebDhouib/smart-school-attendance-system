@@ -9,8 +9,8 @@ import sys
 from datetime import datetime
 
 # Configuration
-BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:3000")
-ENCODINGS_FILE = "/app/encodings/encodings.pkl"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
+ENCODINGS_FILE = os.path.join(os.path.dirname(__file__), "..", "madrasati", "madrasati", "face", "encodings.pkl")
 
 def fetch_active_students():
     """Fetch all active students from the database"""

@@ -24,20 +24,8 @@ COPY madrasati/face/requirements-fused.txt ./
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-fused.txt
 
-# Copy all face service files
-COPY madrasati/face/ ./face/
-COPY docker-setup/app_with_env.py .
-COPY docker-setup/sync_encodings_with_db.py .
-COPY docker-setup/unknown_faces_api_fastapi.py .
-
 # Create necessary directories
 RUN mkdir -p dataset unknown_faces logs encodings
-
-# Copy encodings.pkl if it exists to the encodings directory
-RUN if [ -f "./face/encodings.pkl" ]; then cp ./face/encodings.pkl ./encodings/encodings.pkl; fi
-
-# Set permissions
-RUN chmod +x *.py
 
 EXPOSE 8000 5001
 
