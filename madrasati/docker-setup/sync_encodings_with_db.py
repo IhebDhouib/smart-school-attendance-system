@@ -10,7 +10,8 @@ from datetime import datetime
 
 # Configuration
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
-ENCODINGS_FILE = os.path.join(os.path.dirname(__file__), "..", "madrasati", "madrasati", "face", "encodings.pkl")
+# ✅ Utiliser encodings_arcface.pkl (InsightFace) au lieu de encodings.pkl
+ENCODINGS_FILE = os.path.join(os.path.dirname(__file__), "..", "madrasati", "madrasati", "face", "encodings_arcface.pkl")
 
 def fetch_active_students():
     """Fetch all active students from the database"""
@@ -38,7 +39,8 @@ def load_current_encodings():
             
         with open(ENCODINGS_FILE, "rb") as f:
             data = pickle.load(f)
-            encodings = data.get("encodings", [])
+            # ✅ Utiliser 'embeddings' (clé InsightFace) au lieu de 'encodings'
+            encodings = data.get("embeddings", [])
             names = data.get("names", [])
             
         print(f"📁 Loaded {len(encodings)} encodings for {len(set(names))} unique students")
@@ -104,8 +106,9 @@ def sync_encodings_with_database():
             print(f"💾 Backup created: {backup_file}")
             
             # Save synchronized encodings
+            # ✅ Utiliser 'embeddings' (clé InsightFace) pour cohérence
             synced_data = {
-                "encodings": synced_encodings,
+                "embeddings": synced_encodings,
                 "names": synced_names
             }
             

@@ -9,6 +9,8 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const axios = require("axios");
 const FormData = require("form-data");
+// Allow configuring the Face API URL via environment variable for local vs docker
+const FACE_API_URL = process.env.FACE_API_URL || "http://face-fused:8000";
 
 // 📁 Configuration Multer
 const storage = multer.diskStorage({
@@ -119,7 +121,7 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
           form.append("photo", fs.createReadStream(photoPath));
 
           const response = await axios.post(
-            "http://face-fused:8000/students/add",
+            `${FACE_API_URL}/students/add`,
             form,
             { headers: form.getHeaders() }
           );
@@ -165,7 +167,7 @@ router.delete("/:id", async (req, res) => {
     // 🔥 Call Python API to delete dataset + re-encode
     try {
       const response = await axios.delete(
-        `http://face-fused:8000/students/${student.matricule}`
+        `${FACE_API_URL}/students/${student.matricule}`
       );
       console.log("Face API Delete result:", response.data);
     } catch (err) {
@@ -216,7 +218,7 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
           form.append("photo", fs.createReadStream(photoPath));
 
           const response = await axios.post(
-            "http://face-fused:8000/students/add",
+            `${FACE_API_URL}/students/add`,
             form,
             { headers: form.getHeaders() }
           );

@@ -1,12 +1,21 @@
 # Fused Face API + Detection Dockerfile
+# This container runs three services:
+# 1. Face Encoding API (faceapi.py) - port 8000
+# 2. Unknown Faces API (unknown_faces_api_fastapi.py) - port 5001
+# 3. Real-time Face Detection App (app_with_env.py)
+
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies for OpenCV and face_recognition
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    # Build tools
     build-essential \
     cmake \
+    git \
+    wget \
+    # OpenCV dependencies
     libopencv-dev \
     python3-opencv \
     libglib2.0-0 \
@@ -14,20 +23,54 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    libgl1 \
+    # Additional libraries for InsightFace
     libglib2.0-0 \
+    libxcb1 \
+    # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
+# Copy the entire project structure
+COPY madrasati/ /app/madrasati/
+COPY docker-setup/ /app/docker-setup/
 
-# Copy fused requirements
-COPY madrasati/face/requirements-fused.txt ./
+# Install Python dependencies from fused requirements
+COPY madrasati/face/requirements-fused.txt /app/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-fused.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements-fused.txt
+# Create necessary directories with proper permissions
+RUN mkdir -p \
+    /app/madrasati/face/dataset \
+    /app/madrasati/face/unknown_faces \
+    /app/madrasati/face/logs \
+    /app/madrasati/face/encodings \
+    /root/.insightface/models && \
+    chmod -R 755 /app/madrasati/face
 
-# Create necessary directories
-RUN mkdir -p dataset unknown_faces logs encodings
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app:/app/madrasati:/app/madrasati/face \
+    # InsightFace settings
+    INSIGHTFACE_MODEL=buffalo_l \
+    USE_GPU=False \
+    DET_SIZE=640 \
+    DET_THRESH=0.5 \
+    REC_THRESH=0.45 \
+    # Backend connection
+    BACKEND_URL=http://backend:3000 \
+    WEBSOCKET_URL=ws://backend:3001
 
+# Expose ports
 EXPOSE 8000 5001
 
-# Startup: run FastAPI (faceapi.py) and detection (app_with_env.py)
-CMD ["sh", "-c", "uvicorn face.faceapi:app --host 0.0.0.0 --port 8000 & uvicorn unknown_faces_api_fastapi:app --host 0.0.0.0 --port 5001 & python app_with_env.py"]
+# Copy and make startup script executable
+COPY docker-setup/start_face_services_fused.sh /app/
+RUN chmod +x /app/start_face_services_fused.sh
+
+# Health check - wget sans --spider pour forcer GET
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --quiet --tries=1 -O /dev/null http://localhost:8000/students/encodings/status || exit 1
+
+# Run the startup script
+CMD ["/app/start_face_services_fused.sh"]

@@ -1,0 +1,23 @@
+# InsightFace Requirements (RetinaFace + ArcFace)
+# This replaces the old face_recognition library with modern face detection and recognition
+
+# Core dependencies
+insightface==0.7.3
+onnxruntime==1.19.1
+opencv-python==4.10.0.84
+numpy==1.26.4
+
+# Optional: Real-ESRGAN for super-resolution enhancement
+# Uncomment if you want to enable ESRGAN image enhancement
+# realesrgan
+# basicsr
+
+# Existing dependencies
+requests
+websocket-client
+watchdog
+psutil
+Pillow
+
+# Note: This requires downgrading numpy from 2.x to 1.26.4 for compatibility
+# Run: pip install -r requirements_insightface.txt

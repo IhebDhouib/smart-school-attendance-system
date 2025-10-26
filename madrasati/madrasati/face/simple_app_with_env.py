@@ -1,3 +1,30 @@
+"""
+Face Recognition System Optimized for Security Cameras (Lightweight CNN Version)
+
+🚀 Key Features:
+- Single-scale CNN face detection (lighter processing)
+- No upsampling (reduced CPU load)
+- Outdoor image enhancement for harsh lighting conditions
+- High-resolution camera settings (1080p)
+- Configurable minimum face size (40px default)
+- Optimized for security camera environments
+
+🔧 Configuration:
+- FACE_DETECTION_MODEL: 'cnn' (accurate but lightweight)
+- NUMBER_OF_TIMES_TO_UPSAMPLE: 0 (no upsampling for better performance)
+- MIN_FACE_SIZE: Minimum detectable face size in pixels
+- MAX_FACES_PER_FRAME: Maximum faces to process per frame
+- CAMERA_WIDTH/HEIGHT: Camera resolution settings
+- FRAME_SKIP_INTERVAL: Performance optimization
+
+📊 Performance Optimizations:
+- Frame skipping for real-time processing
+- Multiprocessing for CPU-intensive tasks
+- Threading for I/O operations
+- Adaptive sleep timing
+- No multi-scale detection (single scale only)
+"""
+import face_recognition
 import cv2
 import numpy as np
 import os
@@ -19,44 +46,31 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_compl
 from threading import Lock
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from insightface.app import FaceAnalysis
-from insightface.data import get_image as ins_get_image
 
 # Suppress pkg_resources deprecation warning
 import warnings
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
 
 
-# 📁 Chemins - Use environment variables for Docker compatibility
-ENCODINGS_FILE = os.getenv("ENCODINGS_FILE_ARCFACE", "encodings_arcface.pkl")  # Using ArcFace embeddings now
-UNKNOWN_DIR = os.getenv("UNKNOWN_FACES_DIR", "unknown_faces")
-LOG_FILE = os.path.join(os.getenv("LOG_DIR", "logs"), "logs.csv")
+# 📁 Chemins
+#ENCODINGS_FILE = "/app/encodings/encodings.pkl"
+ENCODINGS_FILE = "encodings_cnn.pkl"
+UNKNOWN_DIR = "unknown_faces"
+LOG_FILE = "logs/logs.csv"
 
-# Backend configuration - Use environment variables for Docker/local compatibility
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
-WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:3001")
+# Backend configuration
+# BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:3000")
+# WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://backend:3001")
+BACKEND_URL = "http://localhost:3000"
+WEBSOCKET_URL = "ws://localhost:3001"
 
-# 🔍 InsightFace Configuration (RetinaFace + ArcFace) - Use environment variables
-INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' (accurate) or 'buffalo_s' (fast)
-USE_GPU = os.getenv("USE_GPU", "False").lower() == "true"  # Set to True if CUDA is available for GPU acceleration
-DET_SIZE_VALUE = int(os.getenv("DET_SIZE", "640"))
-DET_SIZE = (DET_SIZE_VALUE, DET_SIZE_VALUE)  # Detection input size - larger = better for small faces
-DET_THRESH = float(os.getenv("DET_THRESH", "0.5"))  # Detection confidence threshold (0.3-0.7 recommended)
-REC_THRESH = float(os.getenv("REC_THRESH", "0.4"))  # Recognition similarity threshold (lower = stricter)
-
-# 🎨 Image Enhancement
-ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "False").lower() == "true"  # Enable Real-ESRGAN super-resolution (slower but better quality)
-
-# 📹 Camera Configuration for Security
-CAMERA_WIDTH = 1920   # 1080p width for better far face detection
-CAMERA_HEIGHT = 1080  # 1080p height
-CAMERA_FPS = 15       # Reasonable FPS for processing
-
-# 📊 Performance Settings
-MIN_FACE_SIZE = 20  # Minimum face size in pixels (RetinaFace handles small faces well)
+# 🔍 Face Detection Configuration for Security Cameras
+FACE_DETECTION_MODEL = 'cnn'  # 'cnn' for better accuracy, 'hog' for speed
+MIN_FACE_SIZE = 20  # Minimum face size in pixels for face detection
 MAX_FACES_PER_FRAME = 10  # Maximum faces to process per frame
-FRAME_SKIP_INTERVAL = 1  # Process every Nth frame for performance
-ENABLE_INTELLIGENT_FRAME_SKIPPING = True  # Enable scene change detection to skip unchanged frames
+FRAME_SKIP_INTERVAL = 2  # Process every Nth frame for performance
+NUMBER_OF_TIMES_TO_UPSAMPLE = 0  # No upsampling for lighter processing (0=faster, less CPU-intensive)
+ENABLE_INTELLIGENT_FRAME_SKIPPING = False  # Enable scene change detection to skip unchanged frames
 
 # 🚀 CPU Optimization Settings
 MAX_CPU_PROCESSES = 12  # Maximum processes to utilize all CPU cores
@@ -128,8 +142,7 @@ def load_encodings():
     try:
         with open(ENCODINGS_FILE, "rb") as f:
             data = pickle.load(f)
-            # ✅ Utiliser 'embeddings' (clé réelle dans le fichier pickle)
-            return data.get("embeddings", []), data.get("names", [])
+            return data["encodings"], data["names"]
     except Exception as e:
         print(f"❌ Erreur lors du rechargement des encodages: {e}")
         return [], []
@@ -254,38 +267,6 @@ def validate_encodings_with_database():
 # 📂 Dossiers requis
 os.makedirs(UNKNOWN_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-# 🤖 Initialize InsightFace Model (RetinaFace + ArcFace)
-print("🔧 Initializing InsightFace models (RetinaFace + ArcFace)...")
-face_app = None
-
-def initialize_insightface():
-    """Initialize InsightFace FaceAnalysis model"""
-    global face_app
-    try:
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
-        
-        face_app = FaceAnalysis(
-            name=INSIGHTFACE_MODEL,
-            providers=providers
-        )
-        face_app.prepare(ctx_id=0 if USE_GPU else -1, det_size=DET_SIZE, det_thresh=DET_THRESH)
-        
-        print(f"✅ InsightFace initialized successfully!")
-        print(f"   Model: {INSIGHTFACE_MODEL}")
-        print(f"   Providers: {providers}")
-        print(f"   Detection size: {DET_SIZE}")
-        print(f"   Detection threshold: {DET_THRESH}")
-        print(f"   Recognition threshold: {REC_THRESH}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to initialize InsightFace: {e}")
-        print("   Please run: pip install insightface onnxruntime")
-        return False
-
-# Initialize at startup
-if not initialize_insightface():
-    print("⚠️  Warning: InsightFace not initialized. Face recognition will not work.")
 
 # 🔍 Scene Change Detection Settings
 SCENE_CHANGE_THRESHOLD = 15.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
@@ -445,33 +426,24 @@ def encode_faces_from_dataset_local():
                 
             image_path = os.path.join(person_dir, image_name)
             try:
-                # Load and process image with InsightFace
-                image = cv2.imread(image_path)
-                if image is None:
-                    print(f"⚠️  Impossible de charger {image_name}")
-                    continue
+                # Load and process image
+                image = face_recognition.load_image_file(image_path)
+                face_locations = face_recognition.face_locations(image)
                 
-                # Detect faces with RetinaFace
-                faces = face_app.get(image)
-                
-                if not faces or len(faces) == 0:
+                if not face_locations:
                     print(f"⚠️  Aucun visage trouvé dans {image_name}")
                     continue
                 
-                # Get face embeddings (ArcFace)
-                for face in faces:
-                    # Get embedding and normalize it
-                    embedding = np.asarray(face.embedding, dtype=np.float32)
-                    norm = np.linalg.norm(embedding)
-                    if norm > 0:
-                        embedding = embedding / norm
-                    
-                    known_encodings.append(embedding)
+                # Get face encodings
+                face_encodings = face_recognition.face_encodings(image, face_locations)
+                
+                for encoding in face_encodings:
+                    known_encodings.append(encoding)
                     known_names.append(person_name)
                     total_faces_encoded += 1
                     student_faces += 1
                     
-                print(f"   ✅ {image_name}: {len(faces)} visage(s) encodé(s)")
+                print(f"   ✅ {image_name}: {len(face_encodings)} visage(s) encodé(s)")
                 
             except Exception as e:
                 print(f"   ❌ Erreur lors du traitement de {image_name}: {e}")
@@ -503,22 +475,11 @@ def encode_faces_from_dataset_local():
         return False
 
 def load_existing_encodings_local():
-    """Load existing encodings - local version with normalization"""
+    """Load existing encodings - local version"""
     try:
         with open(ENCODINGS_FILE, 'rb') as f:
             data = pickle.load(f)
-        
-        # Ensure embeddings are normalized
-        encodings = data.get('encodings', [])
-        normalized_encodings = []
-        for enc in encodings:
-            emb = np.asarray(enc, dtype=np.float32)
-            norm = np.linalg.norm(emb)
-            if norm > 0:
-                emb = emb / norm
-            normalized_encodings.append(emb)
-        
-        return normalized_encodings, data.get('names', []), data.get('processed_images', {})
+        return data.get('encodings', []), data.get('names', []), data.get('processed_images', {})
     except:
         return [], [], {}
 
@@ -550,24 +511,13 @@ def initialize_encodings():
     try:
         with open(ENCODINGS_FILE, "rb") as f:
             data = pickle.load(f)
-            # ✅ Utiliser 'embeddings' (clé réelle dans le fichier pickle)
-            encodings = data.get("embeddings", [])
-            known_names = data.get("names", [])
-            
-            # Normalize all encodings
-            known_encodings = []
-            for enc in encodings:
-                emb = np.asarray(enc, dtype=np.float32)
-                norm = np.linalg.norm(emb)
-                if norm > 0:
-                    emb = emb / norm
-                known_encodings.append(emb)
+            known_encodings = data["encodings"]
+            known_names = data["names"]
             
         print(f"📊 ENCODING STATISTICS:")
         print(f"   - Total encodings loaded: {len(known_encodings)}")
         print(f"   - Total names loaded: {len(known_names)}")
         print(f"   - Unique students: {len(set(known_names))}")
-        print(f"   - Embedding dimension: {len(known_encodings[0]) if known_encodings else 'N/A'} (ArcFace: 512-dim)")
         
         if known_names:
             name_counts = {}
@@ -610,11 +560,11 @@ def initialize_encodings():
                     # Use local path for sync script
                     sync_script_path = os.path.join(os.path.dirname(__file__), "..", "..","docker-setup", "sync_encodings_with_db.py")
                     os.system(f"python {sync_script_path}")
-                    # Reload encodings after sync - ✅ Utiliser 'embeddings'
+                    # Reload encodings after sync
                     with open(ENCODINGS_FILE, "rb") as f:
                         data = pickle.load(f)
-                        known_encodings = data.get("embeddings", [])
-                        known_names = data.get("names", [])
+                        known_encodings = data["encodings"]
+                        known_names = data["names"]
                     print(f"✅ Encodages synchronisés et rechargés.")
                 
                 # Handle unencoded students (new students in DB without encodings)
@@ -1197,15 +1147,29 @@ def save_unknown_face_from_data(result):
         face_location = result['face_location']
         camera_name = result['camera_name']
         
+        # Validate face image
+        if face_image is None or face_image.size == 0:
+            print(f"❌ Invalid face image data (empty or None)")
+            return
+            
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
         filename = f"{unknown_id}_{timestamp}.jpg"
         filepath = os.path.join(UNKNOWN_DIR, filename)
         
-        cv2.imwrite(filepath, face_image)
-        print(f"💾 Visage inconnu sauvegardé: {filename} (caméra: {camera_name})")
+        # Ensure directory exists
+        os.makedirs(UNKNOWN_DIR, exist_ok=True)
+        
+        # Save image
+        success = cv2.imwrite(filepath, face_image)
+        if success:
+            print(f"💾 ✅ Visage inconnu sauvegardé: {filename} (caméra: {camera_name}) - Size: {face_image.shape}")
+        else:
+            print(f"❌ Failed to write image to {filepath}")
     except Exception as e:
         print(f"❌ Erreur sauvegarde visage inconnu: {e}")
+        import traceback
+        traceback.print_exc()
 
 def enhance_image_for_face_detection(frame):
     """
@@ -1300,8 +1264,8 @@ def process_frame_multiprocess(frame_data):
         detection_time = 0
         recognition_time = 0
     
-    # Ensure global variables are accessible (now using ThreadPoolExecutor - shared memory)
-    global MIN_FACE_SIZE, MAX_FACES_PER_FRAME
+    # Ensure global variables are accessible in multiprocessing context
+    global MIN_FACE_SIZE, MAX_FACES_PER_FRAME, FACE_DETECTION_MODEL
 
     frame, camera_type, camera_name, known_encodings, known_names, frame_count = frame_data
 
@@ -1310,45 +1274,44 @@ def process_frame_multiprocess(frame_data):
     # Get original frame dimensions
     height, width = frame.shape[:2]
 
-    # Apply image enhancement for better face detection (outdoor optimizations)
+    # Apply image enhancement for better face detection
     enhanced_frame = enhance_image_for_face_detection(frame)
 
     # Performance monitoring - detection phase start
     if ENABLE_PERFORMANCE_MONITORING:
         detection_start_time = time.time()
 
-    # Use InsightFace RetinaFace for detection (built-in multi-scale)
-    face_locations = []
-    face_data_list = []
+    # Single-scale face detection with CNN model (lighter, no upsampling)
+    rgb_frame = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
+    face_locations = face_recognition.face_locations(rgb_frame, model=FACE_DETECTION_MODEL, number_of_times_to_upsample=NUMBER_OF_TIMES_TO_UPSAMPLE)
+
+    # Filter by minimum size (for security cameras)
+    min_face_size = globals().get('MIN_FACE_SIZE', 40)
+    filtered_faces = []
+
+    for top, right, bottom, left in face_locations:
+        face_width = right - left
+        face_height = bottom - top
+
+        # Filter faces that are too small
+        if face_width >= min_face_size and face_height >= min_face_size:
+            filtered_faces.append((top, right, bottom, left))
+
+    face_locations = filtered_faces
     
-    try:
-        # Detect faces with RetinaFace (returns face objects with bbox, landmarks, embedding)
-        faces = face_app.get(enhanced_frame)
-        
-        # Extract bounding boxes and embeddings
-        for face in faces:
-            bbox = face.bbox.astype(int)
-            x1, y1, x2, y2 = bbox
-            
-            # Convert to (top, right, bottom, left) format for consistency
-            top, right, bottom, left = y1, x2, y2, x1
-            
-            face_width = right - left
-            face_height = bottom - top
-            
-            # Filter faces that are too small
-            if face_width >= MIN_FACE_SIZE and face_height >= MIN_FACE_SIZE:
-                face_locations.append((top, right, bottom, left))
-                face_data_list.append(face)  # Store face object for embeddings
-        
-        print(f"🎯 RETINAFACE DETECTION RESULTS for {camera_name}:")
-        print(f"   - Total faces detected: {len(faces)}")
-        print(f"   - After size filtering (>={MIN_FACE_SIZE}px): {len(face_locations)}")
-    
-    except Exception as e:
-        print(f"❌ Error during face detection: {e}")
-        faces = []
-        face_data_list = []
+    # Add detailed logging for face detection
+    print(f"🎯 FACE DETECTION RESULTS for {camera_name}:")
+    print(f"   - Faces detected: {len(face_locations)}")
+    print(f"   - Model: {FACE_DETECTION_MODEL.upper()} (no upsampling)")
+    print(f"   - Min face size: {min_face_size}px")
+
+    # Limit the number of faces processed (prioritize larger faces for security)
+    if len(face_locations) > MAX_FACES_PER_FRAME:
+        # Sort by face size (largest first)
+        face_sizes = [(bottom - top) * (right - left) for top, right, bottom, left in face_locations]
+        sorted_indices = np.argsort(face_sizes)[::-1][:MAX_FACES_PER_FRAME]  # Largest faces first
+        face_locations = [face_locations[i] for i in sorted_indices]
+        print(f"   - Limited to: {len(face_locations)} faces (max: {MAX_FACES_PER_FRAME})")
 
     # Complete detection timing even if no faces found
     if ENABLE_PERFORMANCE_MONITORING:
@@ -1357,29 +1320,40 @@ def process_frame_multiprocess(frame_data):
         log_performance_metric('detection_time', detection_time)
         print(f"📊 detection_time: {detection_time * 1000:.2f} ms")
 
-    # Get face embeddings from detected faces (already computed by InsightFace)
-    face_embeddings = []
+    # Get face encodings from original frame
     if face_locations:
         # Performance monitoring - recognition phase start
         if ENABLE_PERFORMANCE_MONITORING:
             recognition_start_time = time.time()
         
-        # Extract and normalize embeddings from face objects
-        for face in face_data_list:
-            embedding = np.asarray(face.embedding, dtype=np.float32)
-            # L2 normalize
-            norm = np.linalg.norm(embedding)
-            if norm > 0:
-                embedding = embedding / norm
-            face_embeddings.append(embedding)
+        face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+
+        # Add CPU-intensive processing to better utilize cores
+        # Process each face encoding with additional analysis
+        enhanced_encodings = []
+        for encoding in face_encodings:
+            # Add some computational work to increase CPU usage
+            # This helps utilize CPU cores more effectively
+            enhanced_encoding = encoding.copy()
+
+            # Perform additional vector operations to increase CPU load
+            if ENABLE_CPU_BOOST:
+                for _ in range(CPU_BOOST_ITERATIONS):  # Configurable iterations
+                    enhanced_encoding = enhanced_encoding * 0.99 + np.random.random(len(encoding)) * 0.01
+                    enhanced_encoding = np.clip(enhanced_encoding, -1, 1)
+
+            enhanced_encodings.append(enhanced_encoding)
+
+        face_encodings = enhanced_encodings
+    else:
+        face_encodings = []
     
     # Si aucun encodage n'est disponible, sauvegarder les visages comme inconnus
-    if not known_encodings or len(known_encodings) == 0:
+    if not known_encodings:
         print(f"⚠️  No encodings available - {len(face_locations)} faces detected will be saved as unknown")
-        if face_locations:  # Sauvegarder seulement toutes les 30 frames
+        if face_locations:  # Save all detected unknown faces
             unknown_faces = []
             for face_location in face_locations:
-                # Coordonnées déjà dans l'échelle originale
                 top, right, bottom, left = face_location
                 face_image = frame[top:bottom, left:right]
                 unknown_faces.append({
@@ -1389,48 +1363,43 @@ def process_frame_multiprocess(frame_data):
                     'camera_name': camera_name
                 })
             results.extend(unknown_faces)
-            print(f"💾 Saved {len(unknown_faces)} unknown faces from {camera_name}")
+            print(f"💾 Queued {len(unknown_faces)} unknown faces from {camera_name}")
         return results
     
     print(f"🔍 Processing {len(face_locations)} faces with {len(known_encodings)} known encodings (Camera: {camera_name})")
     
     current_time = time.time()
     
-    # Convert known_encodings to numpy array for efficient computation
-    known_encodings_array = np.array(known_encodings)
-    
-    for i, (face_embedding, face_location) in enumerate(zip(face_embeddings, face_locations)):
-        print(f"  👤 Processing face {i+1}/{len(face_embeddings)} at location {face_location}")
+    for i, (face_encoding, face_location) in enumerate(zip(face_encodings, face_locations)):
+        print(f"  👤 Processing face {i+1}/{len(face_encodings)} at location {face_location}")
         
-        # Compute cosine similarity with all known faces
-        # Since embeddings are normalized, dot product = cosine similarity
-        similarities = np.dot(known_encodings_array, face_embedding)
+        # Comparer avec les visages connus
+        matches = face_recognition.compare_faces(known_encodings, face_encoding, tolerance=0.6)
+        face_distances = face_recognition.face_distance(known_encodings, face_encoding)
         
-        # Find best match
-        best_match_index = int(np.argmax(similarities))
-        best_similarity = float(similarities[best_match_index])
-        
-        print(f"     🎯 Best match similarity: {best_similarity:.3f} (threshold: {REC_THRESH})")
-        
-        if best_similarity >= REC_THRESH:
-            name = known_names[best_match_index]
-            confidence = best_similarity
+        print(f"     🎯 Found {sum(matches)} matches out of {len(matches)} comparisons")
+        if len(face_distances) > 0:
+            best_match_index = np.argmin(face_distances)
+            best_distance = face_distances[best_match_index]
+            print(f"     📏 Best match distance: {best_distance:.3f} (threshold: 0.6)")
             
-            print(f"     ✅ RECOGNIZED: {name} (confidence: {confidence:.3f})")
-            
-            results.append({
-                'type': 'recognition',
-                'name': name,
-                'confidence': confidence,
-                'camera_type': camera_type,
-                'camera_name': camera_name,
-                'timestamp': current_time
-            })
-        else:
-            print(f"     ❌ No match found - face will be saved as unknown")
-            # Visage inconnu
-            if frame_count % 30 == 0:  # Sauvegarder seulement toutes les 30 frames
-                # Coordonnées déjà dans l'échelle originale
+            if matches[best_match_index]:
+                name = known_names[best_match_index]
+                confidence = 1 - face_distances[best_match_index]
+                
+                print(f"     ✅ RECOGNIZED: {name} (confidence: {confidence:.3f})")
+                
+                results.append({
+                    'type': 'recognition',
+                    'name': name,
+                    'confidence': confidence,
+                    'camera_type': camera_type,
+                    'camera_name': camera_name,
+                    'timestamp': current_time
+                })
+            else:
+                print(f"     ❌ No match found - face will be saved as unknown")
+                # Visage inconnu - save every unknown face
                 top, right, bottom, left = face_location
                 face_image = frame[top:bottom, left:right]
 
@@ -1440,6 +1409,7 @@ def process_frame_multiprocess(frame_data):
                     'face_location': (top, right, bottom, left),
                     'camera_name': camera_name
                 })
+                print(f"     💾 Unknown face queued for saving")
     
     # Performance monitoring - recognition phase end and overall timing
     if ENABLE_PERFORMANCE_MONITORING:
@@ -1522,8 +1492,8 @@ def main():
     # Initialize multiprocessing pool for face recognition
     # Use more processes to fully utilize CPU, regardless of camera count
     num_processes = min(mp.cpu_count(), MAX_CPU_PROCESSES)  # Use up to MAX_CPU_PROCESSES for better CPU utilization
-    print(f"🚀 Utilisation de {num_processes} threads pour la reconnaissance faciale (CPU: {mp.cpu_count()} cores)")
-    print(f"💡 Configuration optimisée: ThreadPoolExecutor pour partager les modèles InsightFace")
+    print(f"🚀 Utilisation de {num_processes} processus pour la reconnaissance faciale (CPU: {mp.cpu_count()} cores)")
+    print(f"💡 Configuration optimisée pour utilisation maximale du CPU")
     
     # Display performance optimization settings
     print(f"⚡ OPTIMISATIONS DE PERFORMANCE:")
@@ -1542,9 +1512,7 @@ def main():
     cpu_report_counter = 0
 
     try:
-        # ✅ Use ThreadPoolExecutor instead of ProcessPoolExecutor
-        # InsightFace models are expensive to load - better to share them across threads
-        with ThreadPoolExecutor(max_workers=num_processes) as process_executor:
+        with ProcessPoolExecutor(max_workers=num_processes) as process_executor:
             while not shutdown_event.is_set():
                 frame_start_time = time.time() if ENABLE_PERFORMANCE_MONITORING else 0
 
@@ -1728,7 +1696,7 @@ def main():
                                         print(f"🔄 {name} détecté récemment ({time_since_last:.1f}s ago) - skipping duplicate")
 
                                 elif result['type'] == 'unknown_face':
-                                    print(f"❓ Unknown face detected on {camera_name} - saving")
+                                    print(f"❓ Unknown face detected on {camera_name} - attempting to save...")
                                     save_unknown_face_from_data(result)
 
                         except Exception as e:

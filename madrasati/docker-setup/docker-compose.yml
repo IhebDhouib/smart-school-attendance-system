@@ -46,8 +46,10 @@ services:
       NODE_ENV: production
       PORT: 3000
       WEBSOCKET_PORT: 3001
-      MONGODB_URI: mongodb://madrasati_user:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati
+      MONGODB_URI: mongodb://madrasati_user:${MONGO_PASSWORD:-madrasati123}@mongodb:27017/madrasati?authSource=madrasati
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      # Face API URL for forwarding student photos
+      FACE_API_URL: http://face-fused:8000
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
@@ -67,15 +69,34 @@ services:
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: 1
+      # Backend connection
       BACKEND_URL: http://backend:3000
       WEBSOCKET_URL: ws://backend:3001
-      
+      # InsightFace configuration (RetinaFace + ArcFace)
+      INSIGHTFACE_MODEL: buffalo_l
+      USE_GPU: "False"
+      DET_SIZE: 640
+      DET_THRESH: 0.5
+      REC_THRESH: 0.45
+      # Paths
+      DATASET_DIR: /app/madrasati/face/dataset
+      ENCODINGS_FILE_ARCFACE: /app/madrasati/face/encodings_arcface.pkl
+      UNKNOWN_FACES_DIR: /app/madrasati/face/unknown_faces
+      LOG_DIR: /app/madrasati/face/logs
     volumes:
-      - face_encodings:/app/encodings
-      - face_unknown:/app/unknown_faces
+      # Mount the face directory for live code editing (no rebuild needed)
+      - ../madrasati/face:/app/madrasati/face
+      # Mount docker-setup for unknown_faces_api
+      - ./unknown_faces_api_fastapi.py:/app/docker-setup/unknown_faces_api_fastapi.py
+      # Persistent storage for encodings and unknown faces
+      - face_encodings:/app/madrasati/face/encodings
+      - face_unknown:/app/madrasati/face/unknown_faces
+      - face_logs:/app/madrasati/face/logs
+      # Optional: Mount dataset if you want to manage it from host
+      # - ./dataset:/app/madrasati/face/dataset
     ports:
-      - "8000:8000"
-      - "5001:5001"
+      - "8000:8000"  # Face Encoding API
+      - "5001:5001"  # Unknown Faces API
     depends_on:
       - backend
     networks:
@@ -104,6 +125,8 @@ volumes:
   face_encodings:
     driver: local
   face_unknown:
+    driver: local
+  face_logs:
     driver: local
   backend_uploads:
     driver: local

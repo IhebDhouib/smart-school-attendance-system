@@ -1,11 +1,58 @@
-opencv-python-headless==4.5.5.64
-face-recognition==1.3.0
-numpy==1.21.6
+# Fused Face Services Requirements
+# This combines requirements for:
+# - faceapi.py (Face encoding API with RetinaFace + ArcFace)
+# - app_with_env.py (Real-time face detection/recognition)
+# - unknown_faces_api_fastapi.py (Unknown faces management)
+
+# ============================================
+# InsightFace (RetinaFace + ArcFace)
+# ============================================
+insightface==0.7.3
+onnxruntime==1.19.2
+
+# ============================================
+# Core Vision/ML Libraries
+# ============================================
+opencv-python==4.10.0.84
+numpy==1.26.4
 Pillow==10.0.1
+
+# ============================================
+# Web Frameworks
+# ============================================
 fastapi==0.104.1
-uvicorn==0.24.0
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
-websocket-client==1.6.4
+
+# ============================================
+# Communication & I/O
+# ============================================
 requests==2.31.0
+websocket-client==1.6.4
 watchdog==3.0.0
 psutil==5.9.6
+
+# ============================================
+# Data Processing
+# ============================================
+pandas==2.0.3
+
+# ============================================
+# Optional: GPU Support
+# ============================================
+# If you have CUDA GPU, replace onnxruntime with:
+# onnxruntime-gpu==1.19.1
+
+# ============================================
+# Optional: Super-Resolution Enhancement
+# ============================================
+# Uncomment these if you want Real-ESRGAN support:
+# realesrgan
+# basicsr
+
+# ============================================
+# Notes
+# ============================================
+# - numpy pinned to 1.26.4 for compatibility with InsightFace extensions
+# - opencv-python pinned to 4.10.0.84 for numpy 1.26.4 compatibility
+# - This replaces the old face_recognition (dlib) library

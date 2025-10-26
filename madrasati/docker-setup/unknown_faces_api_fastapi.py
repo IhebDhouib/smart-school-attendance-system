@@ -16,7 +16,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UNKNOWN_FACES_DIR = "unknown_faces"
+# Use environment variable for Docker compatibility
+UNKNOWN_FACES_DIR = os.getenv("UNKNOWN_FACES_DIR", "unknown_faces")
 
 @app.get("/api/unknown-faces")
 def get_unknown_faces():
