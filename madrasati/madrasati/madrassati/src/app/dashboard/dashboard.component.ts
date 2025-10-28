@@ -13,7 +13,6 @@ Chart.register(...registerables);
   selector: 'app-dashboard',
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css'],
-  encapsulation:ViewEncapsulation.None
 })
 export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('attendanceChart', { static: false }) attendanceChartRef!: ElementRef<HTMLCanvasElement>;

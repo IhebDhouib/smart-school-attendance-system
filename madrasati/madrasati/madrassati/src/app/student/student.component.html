@@ -105,45 +105,117 @@
     <div class="student-list">
       <div class="list-header">
         <h3><i class="fas fa-list-ol"></i> قائمة التلاميذ</h3>
-        <span class="badge">{{ filteredStudents.length }} تلميذ</span>
+        <div class="header-actions">
+          <span class="badge">{{ filteredStudents.length }} تلميذ</span>
+          <div class="items-per-page">
+            <label>عرض:</label>
+            <select (change)="changeItemsPerPage($event)" [value]="itemsPerPage">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div class="table-container">
         <table>
           <thead>
             <tr>
-              <th (click)="sortBy('matricule')">رقم التسجيل</th>
-              <th (click)="sortBy('fullName')">الاسم الكامل</th>
+              <th (click)="sortBy('matricule')" class="sortable">
+                <span>رقم التسجيل</span>
+                <i class="fas" [ngClass]="{
+                  'fa-sort': sortColumn !== 'matricule',
+                  'fa-sort-up': sortColumn === 'matricule' && sortDirection === 'asc',
+                  'fa-sort-down': sortColumn === 'matricule' && sortDirection === 'desc'
+                }"></i>
+              </th>
+              <th (click)="sortBy('fullName')" class="sortable">
+                <span>الاسم الكامل</span>
+                <i class="fas" [ngClass]="{
+                  'fa-sort': sortColumn !== 'fullName',
+                  'fa-sort-up': sortColumn === 'fullName' && sortDirection === 'asc',
+                  'fa-sort-down': sortColumn === 'fullName' && sortDirection === 'desc'
+                }"></i>
+              </th>
               <th>الأب</th>
-              <th (click)="sortBy('dateNaissance')">الميلاد</th>
+              <th (click)="sortBy('dateNaissance')" class="sortable">
+                <span>الميلاد</span>
+                <i class="fas" [ngClass]="{
+                  'fa-sort': sortColumn !== 'dateNaissance',
+                  'fa-sort-up': sortColumn === 'dateNaissance' && sortDirection === 'asc',
+                  'fa-sort-down': sortColumn === 'dateNaissance' && sortDirection === 'desc'
+                }"></i>
+              </th>
               <th>الفئة</th>
               <th>الصور</th>
               <th>الإجراءات</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let student of filteredStudents">
-              <td>{{ student.matricule }}</td>
-              <td>{{ student.fullName }}</td>
+            <tr *ngFor="let student of pagedStudents; let i = index" 
+                [class.row-even]="i % 2 === 0"
+                [class.row-odd]="i % 2 !== 0">
+              <td class="td-matricule">{{ student.matricule }}</td>
+              <td class="td-name">{{ student.fullName }}</td>
               <td>{{ student.nomPere }}</td>
-              <td>{{ student.dateNaissance | date: 'mediumDate' }}</td>
-              <td>{{ getClassroomName(student.classId) }}</td>
-              <td>
+              <td class="td-date">{{ student.dateNaissance | date: 'dd/MM/yyyy' }}</td>
+              <td class="td-class">{{ getClassroomName(student.classId) }}</td>
+              <td class="td-photos">
                 <div class="photos">
                   <img *ngFor="let p of student.photos" [src]="p" alt="photo" />
+                  <span *ngIf="!student.photos || student.photos.length === 0" class="no-photo">
+                    <i class="fas fa-image"></i>
+                  </span>
                 </div>
               </td>
-              <td>
-                <button class="info" (click)="editStudent(student)">
+              <td class="td-actions">
+                <button class="info" (click)="editStudent(student)" title="تعديل">
                   <i class="fas fa-edit"></i>
                 </button>
-                <button class="danger" (click)="deleteStudent(student._id!)">
+                <button class="danger" (click)="deleteStudent(student._id!)" title="حذف">
                   <i class="fas fa-trash-alt"></i>
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination-container" *ngIf="totalPages > 1">
+        <div class="pagination-info">
+          عرض {{ ((currentPage - 1) * itemsPerPage) + 1 }} - 
+          {{ Math.min(currentPage * itemsPerPage, filteredStudents.length) }} 
+          من {{ filteredStudents.length }}
+        </div>
+        
+        <div class="pagination-controls">
+          <button 
+            class="btn-pagination" 
+            (click)="previousPage()" 
+            [disabled]="currentPage === 1"
+            title="السابق">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+          
+          <button 
+            *ngFor="let page of pageNumbers" 
+            class="btn-page" 
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+          
+          <button 
+            class="btn-pagination" 
+            (click)="nextPage()" 
+            [disabled]="currentPage === totalPages"
+            title="التالي">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+        </div>
       </div>
 
       <div *ngIf="filteredStudents.length === 0" class="empty-state">

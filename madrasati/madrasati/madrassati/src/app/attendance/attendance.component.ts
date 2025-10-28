@@ -337,41 +337,54 @@ formatTimeWithYear(ts: string | null): string {
     if (this.currentPage < this.totalPages) this.currentPage++;
   }
 
-  // export CSV simple (matricule, nom, nomPere, présent le selectedDate (Oui/Non), count présences pour la date)
-  exportToCSV(): void {
+  // export Excel (matricule, nom, nomPere, présent le selectedDate (Oui/Non), count présences pour la date)
+  exportToExcel(): void {
     if (!this.selectedClassId) return;
-    const headers = ['Matricule', 'Nom Complet', 'Nom du Père', `Présent le ${this.selectedDate}`, `Nombre d'enregistrements le ${this.selectedDate}`];
-    const rows: string[] = [headers.join(',')];
+    
+    // Importer dynamiquement la bibliothèque xlsx
+    import('xlsx').then(XLSX => {
+      const buildCount = (mat: string) => {
+        const arr = this.studentRecords[mat] || [];
+        return arr.length;
+      };
 
-    const buildCount = (mat: string) => {
-      const arr = this.studentRecords[mat] || [];
-      return arr.length.toString();
-    };
+      // Préparer les données pour Excel
+      const excelData = this.filteredStudents.map(s => {
+        const present = this.isPresent(s.matricule) ? 'Oui' : 'Non';
+        const count = buildCount(s.matricule);
+        return {
+          'Matricule': s.matricule,
+          'Nom Complet': s.fullName,
+          'Nom du Père': s.nomPere,
+          [`Présent le ${this.selectedDate}`]: present,
+          [`Nombre d'enregistrements le ${this.selectedDate}`]: count
+        };
+      });
 
-    this.filteredStudents.forEach(s => {
-      const present = this.isPresent(s.matricule) ? 'Oui' : 'Non';
-      const count = buildCount(s.matricule);
-      const row = [
-        `"${s.matricule}"`,
-        `"${s.fullName}"`,
-        `"${s.nomPere}"`,
-        present,
-        count
+      // Créer une nouvelle feuille de calcul
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // Définir la largeur des colonnes
+      const columnWidths = [
+        { wch: 15 }, // Matricule
+        { wch: 25 }, // Nom Complet
+        { wch: 25 }, // Nom du Père
+        { wch: 20 }, // Présent le
+        { wch: 30 }  // Nombre d'enregistrements
       ];
-      rows.push(row.join(','));
-    });
+      worksheet['!cols'] = columnWidths;
 
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    const fileName = `presences_${this.selectedClassId}_${this.selectedDate}.csv`;
-    link.setAttribute('download', fileName);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      // Créer un nouveau classeur et ajouter la feuille
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Présences');
+
+      // Générer le fichier Excel et le télécharger
+      const fileName = `presences_${this.selectedClassId}_${this.selectedDate}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    }).catch(error => {
+      console.error('Erreur lors de l\'import de xlsx:', error);
+      alert('Erreur lors de l\'export Excel. Veuillez réessayer.');
+    });
   }
 
   trackByStudent(index: number, student: Student) {

@@ -9,26 +9,31 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    # Build tools
-    build-essential \
-    cmake \
-    git \
-    wget \
-    # OpenCV dependencies
-    libopencv-dev \
-    python3-opencv \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libgl1 \
-    # Additional libraries for InsightFace
-    libglib2.0-0 \
-    libxcb1 \
-    # Cleanup
-    && rm -rf /var/lib/apt/lists/*
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
+ && echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries \
+ && apt-get -o Acquire::ForceIPv4=true update \
+ && apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
+     # Basic utilities
+     apt-transport-https \
+     ca-certificates \
+     curl \
+     # Build tools
+     build-essential \
+     cmake \
+     git \
+     wget \
+     # OpenCV dependencies
+     libopencv-dev \
+     python3-opencv \
+     libglib2.0-0 \
+     libsm6 \
+     libxext6 \
+     libxrender-dev \
+     libgomp1 \
+     libgl1 \
+     # Additional libraries for InsightFace
+     libxcb1 \
+ && rm -rf /var/lib/apt/lists/*
 
 # Copy the entire project structure
 COPY madrasati/ /app/madrasati/

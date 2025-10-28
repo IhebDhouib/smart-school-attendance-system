@@ -8,6 +8,9 @@ import { ClassroomService } from 'src/services/classroom.service';
   styleUrls: ['./student.component.css']
 })
 export class StudentComponent implements OnInit, AfterViewInit {
+  // Exposer Math au template
+  Math = Math;
+  
   newStudent: Student = {
     matricule: '',
     fullName: '',
@@ -28,6 +31,11 @@ export class StudentComponent implements OnInit, AfterViewInit {
   allStudents: Student[] = [];
   classrooms: Classroom[] = [];
   birthYears: number[] = [];
+  
+  // Pagination
+  currentPage = 1;
+  itemsPerPage = 10;
+  totalPages = 0;
   
   selectedFiles: File[] = [];
   isEditing = false;
@@ -121,6 +129,8 @@ export class StudentComponent implements OnInit, AfterViewInit {
     });
 
     this.sortStudents();
+    this.currentPage = 1; // Reset to first page
+    this.updatePagination(); // Update pagination
   }
 
   sortBy(column: string) {
@@ -278,7 +288,64 @@ export class StudentComponent implements OnInit, AfterViewInit {
       return `${classroom.name} - ${classroom.grade}`;
     }
     
-    const foundClass = this.classrooms.find(c => c._id === classroom);
-    return foundClass ? `${foundClass.name} - ${foundClass.grade}` : 'Classe inconnue';
+    const found = this.classrooms.find(c => c._id === classroom);
+    return found ? `${found.name} - ${found.grade}` : 'Non assigné';
+  }
+
+  // Méthodes de pagination
+  get pagedStudents(): Student[] {
+    const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+    const endIndex = startIndex + this.itemsPerPage;
+    return this.filteredStudents.slice(startIndex, endIndex);
+  }
+
+  updatePagination() {
+    this.totalPages = Math.ceil(this.filteredStudents.length / this.itemsPerPage);
+    if (this.currentPage > this.totalPages && this.totalPages > 0) {
+      this.currentPage = this.totalPages;
+    }
+    if (this.currentPage < 1) {
+      this.currentPage = 1;
+    }
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+    }
+  }
+
+  previousPage() {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+    }
+  }
+
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+    }
+  }
+
+  get pageNumbers(): number[] {
+    const pages: number[] = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, this.currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(this.totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }
+
+  changeItemsPerPage(event: any) {
+    this.itemsPerPage = parseInt(event.target.value);
+    this.currentPage = 1;
+    this.updatePagination();
   }
 }

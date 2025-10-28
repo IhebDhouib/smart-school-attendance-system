@@ -6,30 +6,172 @@
       <p>تنظيم وإدارة الفصول والمراحل التعليمية</p>
     </div>
 
-    <div class="main-content">
+    <!-- Formulaire d'ajout/modification -->
+    <div class="classroom-form">
+      <h2>
+        <i class="fas fa-plus-circle"></i>
+        {{ isEditing ? 'تعديل فصل دراسي' : 'إضافة فصل دراسي' }}
+      </h2>
 
-      <div class="classroom-box">
-    <h2>إضافة فصل دراسي</h2>
-    <form (submit)="addClassroom(); $event.preventDefault()">
-      <label>اسم الفصل :</label>
-      <input [(ngModel)]="newClassroom.name" name="name" required />
+      <form (submit)="addClassroom(); $event.preventDefault()" class="form-grid">
+        <div class="form-group">
+          <label>اسم الفصل</label>
+          <input 
+            type="text"
+            [(ngModel)]="newClassroom.name" 
+            name="name" 
+            placeholder="مثال: الفصل الأول"
+            required 
+          />
+        </div>
 
-      <label>المستوى :</label>
-      <select [(ngModel)]="newClassroom.grade" name="grade" required>
-        <option *ngFor="let grade of grades" [value]="grade">{{ grade }}</option>
-      </select>
+        <div class="form-group">
+          <label>المستوى</label>
+          <select [(ngModel)]="newClassroom.grade" name="grade" required>
+            <option value="" disabled>اختر المستوى</option>
+            <option *ngFor="let grade of grades" [value]="grade">{{ grade }}</option>
+          </select>
+        </div>
 
-      <button type="submit">إضافة</button>
-    </form>
+        <div class="form-actions">
+          <button type="submit" class="success">
+            <i class="fas" [ngClass]="isEditing ? 'fa-save' : 'fa-plus-circle'"></i>
+            {{ isEditing ? 'تحديث' : 'إضافة' }}
+          </button>
+          <button type="button" *ngIf="isEditing" (click)="resetForm()" class="outline">
+            <i class="fas fa-times-circle"></i> إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
 
-    <h2>قائمة الفصول الدراسية</h2>
-    <ul>
-      <li *ngFor="let classroom of classrooms">
-        {{ classroom.grade }} - {{ classroom.name }}
-        <button (click)="deleteClassroom(classroom._id)">حذف</button>
-      </li>
-    </ul>
-  </div>
+    <!-- Filtres -->
+    <div class="filters">
+      <h3><i class="fas fa-filter"></i> تصفية الفصول</h3>
+      <div class="filter-grid">
+        <div class="form-group">
+          <label>البحث</label>
+          <div class="input-icon">
+            <input 
+              type="text" 
+              [(ngModel)]="searchText" 
+              (input)="applyFilters()" 
+              placeholder="ابحث عن فصل..."
+            />
+            <i class="fas fa-search"></i>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>المستوى</label>
+          <select [(ngModel)]="selectedGrade" (change)="applyFilters()">
+            <option value="">جميع المستويات</option>
+            <option *ngFor="let grade of grades" [value]="grade">{{ grade }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Liste des fصول -->
+    <div class="classroom-list">
+      <div class="list-header">
+        <h3><i class="fas fa-list-ol"></i> قائمة الفصول الدراسية</h3>
+        <div class="header-actions">
+          <span class="badge">{{ filteredClassrooms.length }} فصل</span>
+          <div class="items-per-page">
+            <label>عرض:</label>
+            <select (change)="changeItemsPerPage($event)" [value]="itemsPerPage">
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th (click)="sortBy('name')" class="sortable">
+                <span>اسم الفصل</span>
+                <i class="fas" [ngClass]="{
+                  'fa-sort': sortColumn !== 'name',
+                  'fa-sort-up': sortColumn === 'name' && sortDirection === 'asc',
+                  'fa-sort-down': sortColumn === 'name' && sortDirection === 'desc'
+                }"></i>
+              </th>
+              <th (click)="sortBy('grade')" class="sortable">
+                <span>المستوى</span>
+                <i class="fas" [ngClass]="{
+                  'fa-sort': sortColumn !== 'grade',
+                  'fa-sort-up': sortColumn === 'grade' && sortDirection === 'asc',
+                  'fa-sort-down': sortColumn === 'grade' && sortDirection === 'desc'
+                }"></i>
+              </th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let classroom of pagedClassrooms; let i = index" 
+                [class.row-even]="i % 2 === 0"
+                [class.row-odd]="i % 2 !== 0">
+              <td class="td-name">
+                <i class="fas fa-chalkboard"></i>
+                {{ classroom.name }}
+              </td>
+              <td class="td-grade">
+                <span class="grade-badge">{{ classroom.grade }}</span>
+              </td>
+              <td class="td-actions">
+                <button class="danger" (click)="deleteClassroom(classroom._id)" title="حذف">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination-container" *ngIf="totalPages > 1">
+        <div class="pagination-info">
+          عرض {{ ((currentPage - 1) * itemsPerPage) + 1 }} - 
+          {{ Math.min(currentPage * itemsPerPage, filteredClassrooms.length) }} 
+          من {{ filteredClassrooms.length }}
+        </div>
+        
+        <div class="pagination-controls">
+          <button 
+            class="btn-pagination" 
+            (click)="previousPage()" 
+            [disabled]="currentPage === 1"
+            title="السابق">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+          
+          <button 
+            *ngFor="let page of pageNumbers" 
+            class="btn-page" 
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+          
+          <button 
+            class="btn-pagination" 
+            (click)="nextPage()" 
+            [disabled]="currentPage === totalPages"
+            title="التالي">
+            <i class="fas fa-chevron-left"></i>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="filteredClassrooms.length === 0" class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>لم يتم العثور على أي فصل دراسي.</p>
+      </div>
     </div>
   </div>
 </div>

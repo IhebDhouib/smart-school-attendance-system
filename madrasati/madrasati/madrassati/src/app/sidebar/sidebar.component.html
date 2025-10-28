@@ -1,28 +1,14 @@
-<!-- Toggle Button -->
-<button class="sidebar-toggle" 
-        (click)="toggleSidebar()" 
-        [attr.aria-label]="isCollapsed ? 'فتح القائمة' : 'إغلاق القائمة'"
-        [attr.aria-expanded]="!isCollapsed">
-  <i class="fas fa-bars" [class.rotated]="!isCollapsed" aria-hidden="true"></i>
-</button>
+
 
 <!-- Sidebar -->
-<aside class="sidebar" 
-       [class.collapsed]="isCollapsed && !isMobile"
-       [class.mobile-collapsed]="isCollapsed && isMobile"
-       [attr.aria-hidden]="isCollapsed">
+<aside class="sidebar" >
   <!-- Header -->
   <div class="sidebar-header">
     <div class="logo">
       <img src="assets/image/wassim.png" alt="Logo" class="logo-image">
       <span class="logo-text">حضوري</span>
     </div>
-    <button class="close-sidebar" 
-            (click)="toggleSidebar()" 
-            *ngIf="isMobile"
-            aria-label="إغلاق القائمة">
-      <i class="fas fa-times" aria-hidden="true"></i>
-    </button>
+    
   </div>
 
   <!-- Navigation Menu -->

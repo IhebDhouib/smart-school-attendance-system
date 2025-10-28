@@ -446,3 +446,5 @@
 {"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-08-18T19:18:46.301Z"}
 {"level":"info","message":"Express server running on port 3000","timestamp":"2025-08-19T00:24:12.847Z"}
 {"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-19T00:24:12.881Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-10-26T19:58:16.586Z"}
+{"error":"getaddrinfo ENOTFOUND mongodb","level":"error","message":"MongoDB connection error","stack":"MongooseServerSelectionError: getaddrinfo ENOTFOUND mongodb\n    at _handleConnectionErrors (C:\\Users\\USER\\Desktop\\smart-school-attendance-system\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1165:11)\n    at NativeConnection.openUri (C:\\Users\\USER\\Desktop\\smart-school-attendance-system\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1096:11)","timestamp":"2025-10-26T19:58:46.584Z"}
