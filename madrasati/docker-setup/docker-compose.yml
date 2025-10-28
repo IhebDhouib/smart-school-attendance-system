@@ -85,7 +85,7 @@ services:
       LOG_DIR: /app/madrasati/face/logs
     volumes:
       # Mount the face directory for live code editing (no rebuild needed)
-      - ../madrasati/face:/app/madrasati/face
+      - face_data:/app/madrasati/face
       # Mount docker-setup for unknown_faces_api
       - ./unknown_faces_api_fastapi.py:/app/docker-setup/unknown_faces_api_fastapi.py
       # Persistent storage for encodings and unknown faces
@@ -131,6 +131,8 @@ volumes:
   backend_uploads:
     driver: local
   backend_logs:
+    driver: local
+  face_data:
     driver: local
 
 

@@ -19,6 +19,21 @@ mkdir -p /root/.insightface/models
 # Set proper working directory and permissions
 chmod -R 755 /app/madrasati/face
 
+# Ensure encodings file exists (create empty pickle if missing).
+# This is important when the host bind-mount is empty — create a placeholder
+# so the services that expect the file won't fail at startup.
+ENC_FILE="/app/madrasati/face/encodings_arcface.pkl"
+if [ ! -f "$ENC_FILE" ]; then
+    echo "⚠️  Encodings file not found. Creating empty encodings file at $ENC_FILE"
+    python - <<PY
+import pickle
+open('$ENC_FILE','wb').write(pickle.dumps({}))
+print('✅ Created empty encodings pickle')
+PY
+    # Ensure file permissions allow the service to read/write
+    chmod 664 "$ENC_FILE" || true
+fi
+
 # Check if InsightFace models are downloaded
 echo "🔍 Checking InsightFace models..."
 if [ ! -d "/root/.insightface/models" ] || [ -z "$(ls -A /root/.insightface/models)" ]; then
