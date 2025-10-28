@@ -1,0 +1,26 @@
+# Exclude data directories from Docker build context
+data/
+docker-setup/data/
+
+# Exclude node_modules
+node_modules/
+
+# Exclude logs
+logs/
+
+# Exclude git
+.git/
+.gitignore
+
+# Exclude temporary files
+*.tmp
+*.log
+*.pid
+*.lock
+
+# Exclude MongoDB data files
+*.mongodb
+*.wt
+*.ns
+*.bson
+*.metadata
