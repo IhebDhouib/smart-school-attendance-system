@@ -1,7 +1,18 @@
 <div class="app-container" [class.loaded]="isLoaded">
+  <!-- Mobile Menu Toggle Button -->
+  <button class="sidebar-toggle" 
+          *ngIf="showSidebar" 
+          (click)="toggleSidebar()"
+          [class.sidebar-open]="!sidebarCollapsed"
+          aria-label="فتح/إغلاق القائمة"
+          title="القائمة">
+    <i class="fas fa-bars"></i>
+  </button>
+
   <app-sidebar 
     *ngIf="showSidebar" 
     class="sidebar-wrapper"
+    #sidebar
     (collapsedChange)="onSidebarCollapsedChange($event)">
   </app-sidebar>
   

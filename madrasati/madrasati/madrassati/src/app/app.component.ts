@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, AfterViewInit, ViewChild } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
+import { SidebarComponent } from './sidebar/sidebar.component';
 
 @Component({
   selector: 'app-root',
@@ -9,6 +10,8 @@ import { Subject } from 'rxjs';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild('sidebar') sidebarComponent?: SidebarComponent;
+  
   showSidebar = true; // Start with true as default
   sidebarCollapsed = false; // Track sidebar collapsed state
   isLoaded = false; // Track if app has finished loading
@@ -108,5 +111,11 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     setTimeout(() => {
       this.cdr.detectChanges();
     }, 50);
+  }
+
+  toggleSidebar() {
+    if (this.sidebarComponent) {
+      this.sidebarComponent.toggleSidebar();
+    }
   }
 }

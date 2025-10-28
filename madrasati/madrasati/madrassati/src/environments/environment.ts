@@ -1,5 +1,5 @@
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:3000/api',  // Development backend
-  websocketUrl: 'ws://localhost:3001' // WebSocket server in main backend container
+  apiUrl: 'http://192.168.1.11:3000/api',  // Replace YOUR_PC_IP with your actual IP (e.g., 192.168.1.5)
+  websocketUrl: 'ws://192.168.1.11:3001' // Replace YOUR_PC_IP with your actual IP
 };

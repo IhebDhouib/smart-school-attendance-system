@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, ChangeDetectorRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ViewEncapsulation, ChangeDetectorRef, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { StudentService, Student, Classroom } from 'src/services/student.service';
 import { ClassroomService } from 'src/services/classroom.service';
 
@@ -10,6 +10,9 @@ import { ClassroomService } from 'src/services/classroom.service';
 export class StudentComponent implements OnInit, AfterViewInit {
   // Exposer Math au template
   Math = Math;
+  
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+  @ViewChild('cameraInput') cameraInput!: ElementRef<HTMLInputElement>;
   
   newStudent: Student = {
     matricule: '',
@@ -166,6 +169,20 @@ export class StudentComponent implements OnInit, AfterViewInit {
 
   onFileSelected(event: any) {
     this.selectedFiles = Array.from(event.target.files);
+  }
+
+  openCamera() {
+    // Trigger the camera input
+    if (this.cameraInput) {
+      this.cameraInput.nativeElement.click();
+    }
+  }
+
+  openGallery() {
+    // Trigger the gallery input
+    if (this.fileInput) {
+      this.fileInput.nativeElement.click();
+    }
   }
 
   onExcelSelected(event: any) {

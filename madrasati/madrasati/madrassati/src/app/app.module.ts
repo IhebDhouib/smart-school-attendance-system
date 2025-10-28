@@ -6,6 +6,7 @@ import { SidebarComponent } from './sidebar/sidebar.component';
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { AuthInterceptor } from './interceptors/auth.interceptor';
+import { ErrorHandlerInterceptor } from './interceptors/error-handler.interceptor';
 import { BrowserModule } from '@angular/platform-browser';
 import { ClassroomComponent } from './classroom/classroom.component';
 import { StudentComponent } from './student/student.component';
@@ -39,6 +40,11 @@ import { FormsModule } from '@angular/forms';
     {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptor,
+      multi: true
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: ErrorHandlerInterceptor,
       multi: true
     }
   ],

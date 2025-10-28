@@ -58,7 +58,38 @@
 
         <div class="form-group">
           <label>الصور</label>
-          <input type="file" (change)="onFileSelected($event)" multiple />
+          <div class="photo-upload-options">
+            <button type="button" class="upload-option-btn camera-btn" (click)="openCamera()">
+              <i class="fas fa-camera"></i>
+              <span>التقاط صورة</span>
+            </button>
+            <button type="button" class="upload-option-btn gallery-btn" (click)="openGallery()">
+              <i class="fas fa-images"></i>
+              <span>اختيار من المعرض</span>
+            </button>
+          </div>
+          <input 
+            #fileInput
+            type="file" 
+            (change)="onFileSelected($event)" 
+            multiple 
+            accept="image/*"
+            style="display: none;"
+          />
+          <input 
+            #cameraInput
+            type="file" 
+            (change)="onFileSelected($event)" 
+            capture="environment"
+            accept="image/*"
+            style="display: none;"
+          />
+          <div *ngIf="selectedFiles.length > 0" class="selected-files-preview">
+            <span class="files-count">
+              <i class="fas fa-check-circle"></i>
+              {{ selectedFiles.length }} صورة محددة
+            </span>
+          </div>
         </div>
       </div>
 

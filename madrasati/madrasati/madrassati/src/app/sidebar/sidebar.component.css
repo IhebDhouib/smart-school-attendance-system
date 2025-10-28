@@ -193,6 +193,58 @@
   border-radius: 8px;
 }
 
+/* Toggle Sidebar Button - Works for both mobile and desktop */
+.toggle-sidebar-btn {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+}
+
+.toggle-sidebar-btn:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: scale(1.1);
+}
+
+.toggle-sidebar-btn:active {
+  transform: scale(0.95);
+}
+
+.toggle-sidebar-btn i {
+  font-size: 1.1rem;
+  transition: transform var(--transition-fast);
+  display: inline-block;
+}
+
+/* Hide toggle button on collapsed desktop sidebar */
+.sidebar.collapsed .toggle-sidebar-btn {
+  position: absolute;
+  right: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  padding: 10px;
+  background: var(--sidebar-item-active);
+  border: 2px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
+.sidebar.collapsed .toggle-sidebar-btn:hover {
+  transform: translateY(-50%) scale(1.15);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Old close-sidebar style - kept for backward compatibility */
 .close-sidebar {
   background: none;
   border: none;

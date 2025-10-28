@@ -1,14 +1,22 @@
 
 
 <!-- Sidebar -->
-<aside class="sidebar" >
+<aside class="sidebar" 
+       [class.collapsed]="isCollapsed && !isMobile"
+       [class.mobile-collapsed]="isCollapsed && isMobile">
   <!-- Header -->
   <div class="sidebar-header">
     <div class="logo">
       <img src="assets/image/wassim.png" alt="Logo" class="logo-image">
       <span class="logo-text">حضوري</span>
     </div>
-    
+    <!-- Toggle button for both mobile and desktop -->
+    <button class="toggle-sidebar-btn" 
+            (click)="toggleSidebar()" 
+            [attr.aria-label]="isCollapsed ? 'فتح القائمة' : 'إغلاق القائمة'"
+            [title]="isCollapsed ? 'فتح القائمة' : 'إغلاق القائمة'">
+      <i class="fas" [class.fa-chevron-left]="!isCollapsed" [class.fa-chevron-right]="isCollapsed"></i>
+    </button>
   </div>
 
   <!-- Navigation Menu -->
