@@ -11,7 +11,8 @@ from datetime import datetime
 # Configuration
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 # ✅ Utiliser encodings_arcface.pkl (InsightFace) au lieu de encodings.pkl
-ENCODINGS_FILE = os.path.join(os.path.dirname(__file__), "..", "madrasati", "madrasati", "face", "encodings_arcface.pkl")
+# Use environment variable or Docker container path
+ENCODINGS_FILE = os.getenv("ENCODINGS_FILE_ARCFACE", "/app/face/encodings_arcface.pkl")
 
 def fetch_active_students():
     """Fetch all active students from the database"""
