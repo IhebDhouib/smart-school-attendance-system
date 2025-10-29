@@ -67,7 +67,11 @@ except ImportError as e:
 # ============================================
 # SINGLE CAMERA CONFIGURATION
 # ============================================
-SINGLE_CAMERA_URL = "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25"
+# For local development (your PC):
+# SINGLE_CAMERA_URL = "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25"
+
+# For server deployment - CHANGE THIS IP TO YOUR SERVER'S CAMERA IP:
+SINGLE_CAMERA_URL = os.getenv("CAMERA_URL", "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25")
 SINGLE_CAMERA_NAME = "RTSP Camera 1"
 SINGLE_CAMERA_TYPE = "entry"  # Can be 'entry' or 'exit'
 # ============================================
@@ -381,6 +385,8 @@ ws_reconnect_attempts = 0
 max_reconnect_attempts = 10
 reconnect_interval = 5
 ws_lock = Lock()
+ws_last_activity = 0  # Track last WebSocket activity
+ws_check_interval = 60  # Check connection every 60 seconds
 
 # Shutdown event for clean thread exit
 shutdown_event = threading.Event()
@@ -396,63 +402,107 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 def on_message(ws, message):
-    print(f"📨 Message reçu: {message}")
+    global ws_last_activity
+    print(f"📨 WebSocket message received: {message}")
+    ws_last_activity = time.time()
 
 def on_error(ws, error):
-    print(f"❌ Erreur WebSocket: {error}")
+    print(f"❌ WebSocket error: {error}")
     global ws_connected
     with ws_lock:
         ws_connected = False
 
 def on_close(ws, close_status_code, close_msg):
-    print(f"🔌 Connexion WebSocket fermée (Code: {close_status_code}, Message: {close_msg})")
+    print(f"🔌 WebSocket closed (Code: {close_status_code}, Message: {close_msg})")
     global ws_connected
     with ws_lock:
         ws_connected = False
 
 def on_open(ws):
-    print("✅ Connexion WebSocket établie")
-    global ws_connected, ws_reconnect_attempts
+    global ws_connected, ws_reconnect_attempts, ws_last_activity
+    print("✅ WebSocket connected successfully")
     with ws_lock:
         ws_connected = True
         ws_reconnect_attempts = 0
+        ws_last_activity = time.time()
+
+def on_ping(ws, message):
+    global ws_last_activity
+    print("🏓 Received ping from server")
+    ws_last_activity = time.time()
+    # websocket-client automatically responds with pong
+
+def on_pong(ws, message):
+    global ws_last_activity
+    print("🏓 Pong sent to server")
+    ws_last_activity = time.time()
 
 def connect_websocket():
-    """Établit la connexion WebSocket"""
+    """Établit la connexion WebSocket avec meilleure gestion des erreurs"""
     global ws, ws_connected
     try:
         if ws:
-            ws.close()
-            
+            try:
+                ws.close()
+            except:
+                pass
+
+        print(f"🔌 Connecting to WebSocket: {WEBSOCKET_URL}")
+
         ws = websocket.WebSocketApp(WEBSOCKET_URL,
                                   on_open=on_open,
                                   on_message=on_message,
                                   on_error=on_error,
-                                  on_close=on_close)
-        
-        # Démarrer la connexion WebSocket dans un thread séparé avec ping/pong
+                                  on_close=on_close,
+                                  on_ping=on_ping,
+                                  on_pong=on_pong)
+
+        # Configuration pour éviter les reconnexions trop fréquentes
+        # ping_interval=None, ping_timeout=None : laisser le serveur gérer les ping/pong
+        # reconnect=10 : attendre 10 secondes avant de reconnecter
         ws_thread = threading.Thread(
             target=lambda: ws.run_forever(
-                ping_interval=20,  # Send ping every 20 seconds
-                ping_timeout=10    # Wait 10 seconds for pong response
-            ), 
+                ping_interval=None,  # Désactiver les ping du client
+                ping_timeout=None,   # Désactiver le timeout ping du client
+                reconnect=10         # Attendre 10 secondes avant de reconnecter
+            ),
             daemon=True
         )
         ws_thread.start()
-        
+
         # Attendre un peu pour la connexion
-        time.sleep(2)
-        
+        time.sleep(3)
+
+        # Vérifier si la connexion a réussi
+        with ws_lock:
+            if ws_connected:
+                print("✅ WebSocket connection established and stable")
+            else:
+                print("⚠️  WebSocket connection attempt completed, but status uncertain")
+
     except Exception as e:
-        print(f"❌ Erreur lors de la connexion WebSocket: {e}")
+        print(f"❌ WebSocket connection failed: {e}")
         with ws_lock:
             ws_connected = False
+
+def check_websocket_connection():
+    """Vérifie périodiquement l'état de la connexion WebSocket"""
+    global ws_connected, ws_last_activity
+
+    current_time = time.time()
+
+    with ws_lock:
+        # Si pas connecté, essayer de reconnecter
+        if not ws_connected:
+            print("🔌 WebSocket not connected, attempting to reconnect...")
+            connect_websocket()
+            return
 
 def send_websocket_message(message):
     """Envoie un message via WebSocket avec retry logic"""
     global ws, ws_connected
     max_retries = 3
-    
+
     for attempt in range(max_retries):
         try:
             with ws_lock:
@@ -463,11 +513,33 @@ def send_websocket_message(message):
             print(f"❌ Erreur envoi WebSocket (tentative {attempt + 1}): {e}")
             with ws_lock:
                 ws_connected = False
-            
+
             if attempt < max_retries - 1:
                 time.sleep(1)
-                
+
     return False
+
+def check_websocket_connection():
+    """Vérifie périodiquement l'état de la connexion WebSocket"""
+    global ws_connected, ws_last_activity
+
+    current_time = time.time()
+
+    with ws_lock:
+        # Si pas connecté, essayer de reconnecter
+        if not ws_connected:
+            print("🔌 WebSocket not connected, attempting to reconnect...")
+            connect_websocket()
+            return
+
+        # Vérifier si on a eu de l'activité récente (ping/pong ou messages)
+        time_since_last_activity = current_time - ws_last_activity
+        if time_since_last_activity > 120:  # 2 minutes sans activité
+            print(f"⚠️  No WebSocket activity for {time_since_last_activity:.0f} seconds, reconnecting...")
+            ws_connected = False
+            connect_websocket()
+        else:
+            print(f"✅ WebSocket healthy (last activity: {time_since_last_activity:.0f}s ago)")
 
 def verify_student_exists(student_id):
     """Verify if student exists in database before logging attendance"""
@@ -778,11 +850,7 @@ def process_frame(frame, camera_type, camera_name):
     """
     global known_encodings, known_names, frame_count, previous_frames
     
-    # ⏱️ Start timing - Frame enters processing
     frame_start_time = time.time()
-    print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
-    print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-    
     results = []
     frame_count += 1
 
@@ -812,15 +880,16 @@ def process_frame(frame, camera_type, camera_name):
         
         # Skip frame if change is below threshold
         if change_percentage < SCENE_CHANGE_PIXEL_THRESHOLD:
-            # 🔇 Logs supprimés pour éviter le spam
-            # print(f"⏭️  Frame skipped - No significant scene change ({change_percentage:.2f}% < {SCENE_CHANGE_PIXEL_THRESHOLD}%)")
-            # print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
-            # print(f"⏱️  ========== FRAME {frame_count} SKIPPED ==========\n")
+            # 🔇 No logs for skipped frames
             return results
         else:
-            # 🔇 Log réduit - seulement si frame est traitée
-            # print(f"🔄 Scene changed ({change_percentage:.2f}% >= {SCENE_CHANGE_PIXEL_THRESHOLD}%) - Processing frame")
-            # print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+            # 🔄 Movement detected - processing frame
+            # ⏱️ Start timing - Frame enters processing
+            
+            print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
+            print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            
+            print(f"🔄 Movement detected ({change_percentage:.2f}% change) - Processing frame")
             pass
     
     # Store current frame for next comparison
@@ -1032,6 +1101,7 @@ def main():
     camera_type = camera_data['type']
     
     frame_skip_counter = 0
+    websocket_check_counter = 0
 
     try:
         while not shutdown_event.is_set():
@@ -1039,6 +1109,12 @@ def main():
             if shutdown_event.is_set():
                 print("🔄 Signal d'arrêt détecté, arrêt du traitement...")
                 break
+
+            # Periodic WebSocket health check (every 60 seconds)
+            websocket_check_counter += 1
+            if websocket_check_counter >= 600:  # 60 seconds * 10 iterations per second
+                check_websocket_connection()
+                websocket_check_counter = 0
             
             # Read frame from camera
             ret, frame = cap.read()
