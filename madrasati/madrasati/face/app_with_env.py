@@ -1,3 +1,29 @@
+"""
+Single Camera Face Recognition System with RetinaFace Detector
+
+PERFORMANCE OPTIMIZATION:
+- Set ENHANCEMENT_LEVEL to control speed vs quality trade-off:
+  * "none"     - No enhancement (~0ms)     - Fastest, lowest quality
+  * "fast"     - CLAHE only (~10-20ms)     - ⭐ RECOMMENDED for real-time
+  * "balanced" - CLAHE + sharpen (~50-100ms) - Good balance
+  * "quality"  - Full pipeline (~500-700ms) - Best quality, very slow
+
+USAGE:
+  # For real-time (recommended):
+  ENHANCEMENT_LEVEL=fast python app_with_env_single_camera_scrfd.py
+  
+  # For maximum quality (slow):
+  ENHANCEMENT_LEVEL=quality python app_with_env_single_camera_scrfd.py
+  
+  # No enhancement (fastest):
+  ENHANCEMENT_LEVEL=none python app_with_env_single_camera_scrfd.py
+
+EXPECTED TIMING (per frame):
+  Enhancement: 10-20ms (fast) | 50-100ms (balanced) | 500-700ms (quality)
+  Detection:   100-200ms (RetinaFace is accurate!)
+  Total:       ~110-220ms per frame with "fast" level = 4-9 FPS
+"""
+
 import cv2
 import numpy as np
 import os
@@ -26,6 +52,25 @@ from insightface.data import get_image as ins_get_image
 import warnings
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
 
+# 🎨 Real-ESRGAN imports for image enhancement
+try:
+    from realesrgan import RealESRGANer
+    from basicsr.archs.rrdbnet_arch import RRDBNet
+    ESRGAN_AVAILABLE = True
+    print("✅ Real-ESRGAN libraries loaded successfully")
+except ImportError as e:
+    ESRGAN_AVAILABLE = False
+    print(f"⚠️  Real-ESRGAN not available: {e}")
+    print("   Install with: pip install realesrgan basicsr facexlib gfpgan")
+    print("   System will use OpenCV enhancement instead")
+
+# ============================================
+# SINGLE CAMERA CONFIGURATION
+# ============================================
+SINGLE_CAMERA_URL = "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25"
+SINGLE_CAMERA_NAME = "RTSP Camera 1"
+SINGLE_CAMERA_TYPE = "entry"  # Can be 'entry' or 'exit'
+# ============================================
 
 # 📁 Chemins - Use environment variables for Docker compatibility
 ENCODINGS_FILE = os.getenv("ENCODINGS_FILE_ARCFACE", "encodings_arcface.pkl")  # Using ArcFace embeddings now
@@ -37,15 +82,24 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:3001")
 
 # 🔍 InsightFace Configuration (RetinaFace + ArcFace) - Use environment variables
-INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' (accurate) or 'buffalo_s' (fast)
+INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' uses RetinaFace detector (more accurate)
 USE_GPU = os.getenv("USE_GPU", "False").lower() == "true"  # Set to True if CUDA is available for GPU acceleration
 DET_SIZE_VALUE = int(os.getenv("DET_SIZE", "640"))
 DET_SIZE = (DET_SIZE_VALUE, DET_SIZE_VALUE)  # Detection input size - larger = better for small faces
-DET_THRESH = float(os.getenv("DET_THRESH", "0.5"))  # Detection confidence threshold (0.3-0.7 recommended)
-REC_THRESH = float(os.getenv("REC_THRESH", "0.4"))  # Recognition similarity threshold (lower = stricter)
+DET_THRESH = float(os.getenv("DET_THRESH", "0.3"))  # Detection confidence threshold (LOWERED to 0.3 for better detection)
+REC_THRESH = float(os.getenv("REC_THRESH", "0.3"))  # Recognition similarity threshold (lower = stricter)
 
 # 🎨 Image Enhancement
-ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "False").lower() == "true"  # Enable Real-ESRGAN super-resolution (slower but better quality)
+ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "False").lower() == "true"  # Enable Real-ESRGAN super-resolution (VERY slow ~500ms)
+ESRGAN_MODEL_PATH = os.getenv("ESRGAN_MODEL_PATH", "RealESRGAN_x2plus.pth")  # Model file path
+ESRGAN_SCALE = int(os.getenv("ESRGAN_SCALE", "2"))  # Upscaling factor (2x or 4x)
+
+# Enhancement level: "none", "fast", "balanced", "quality"
+# - none: No enhancement (~0ms) - Use original frame
+# - fast: CLAHE only (~10-20ms) - Good for real-time
+# - balanced: CLAHE + sharpening (~50-100ms) - Good quality/speed trade-off
+# - quality: Full enhancement (~500-700ms) - Maximum quality but slow
+ENHANCEMENT_LEVEL = os.getenv("ENHANCEMENT_LEVEL", "fast").lower()
 
 # 📹 Camera Configuration for Security
 CAMERA_WIDTH = 1920   # 1080p width for better far face detection
@@ -53,8 +107,8 @@ CAMERA_HEIGHT = 1080  # 1080p height
 CAMERA_FPS = 15       # Reasonable FPS for processing
 
 # 📊 Performance Settings
-MIN_FACE_SIZE = 20  # Minimum face size in pixels (RetinaFace handles small faces well)
-MAX_FACES_PER_FRAME = 10  # Maximum faces to process per frame
+MIN_FACE_SIZE = 10  # REDUCED from 20 - Minimum face size in pixels (detect smaller faces)
+MAX_FACES_PER_FRAME = 20  # INCREASED from 10 - Maximum faces to process per frame
 FRAME_SKIP_INTERVAL = 1  # Process every Nth frame for performance
 ENABLE_INTELLIGENT_FRAME_SKIPPING = True  # Enable scene change detection to skip unchanged frames
 
@@ -68,11 +122,6 @@ ENABLE_PERFORMANCE_MONITORING = False  # Enable lightweight performance tracking
 PERFORMANCE_REPORT_INTERVAL = 50  # Report performance every N frames
 TRACK_DETAILED_TIMING = False  # Enable detailed timing (impacts performance slightly)
 
-# 📹 Camera Configuration for Security
-CAMERA_WIDTH = 1920   # 1080p width for better far face detection
-CAMERA_HEIGHT = 1080  # 1080p height
-CAMERA_FPS = 15       # Reasonable FPS for processing
-
 # 📈 Performance Monitoring Variables
 perf_frame_count = 0
 perf_total_frame_time = 0
@@ -82,6 +131,12 @@ perf_total_io_time = 0
 perf_faces_detected = 0
 perf_faces_recognized = 0
 perf_start_time = time.time()
+
+# 🔍 Scene Change Detection Settings
+SCENE_CHANGE_THRESHOLD = 2.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
+SCENE_CHANGE_MIN_CONTOUR_AREA = 300  # Minimum contour area to consider for change - reduced for sensitivity
+ENABLE_SCENE_CHANGE_DETECTION = True  # Enable/disable scene change detection
+SCENE_CHANGE_PIXEL_THRESHOLD = 2.0  # Threshold for mean pixel difference method
 
 def reset_performance_stats():
     """Reset performance monitoring statistics"""
@@ -134,394 +189,6 @@ def load_encodings():
         print(f"❌ Erreur lors du rechargement des encodages: {e}")
         return [], []
 
-def validate_encodings(verbose=True):
-    """Valide le fichier d'encodages et affiche des statistiques"""
-    stats = {
-        'valid': False,
-        'total_encodings': 0,
-        'unique_persons': 0,
-        'avg_encodings_per_person': 0,
-        'persons': {}
-    }
-    
-    try:
-        encodings, names = load_encodings()
-        
-        if not encodings or not names:
-            if verbose:
-                print("❌ Aucun encodage trouvé.")
-            return stats
-        
-        if len(encodings) != len(names):
-            if verbose:
-                print("❌ Incohérence: nombre d'encodages ≠ nombre de noms")
-            return stats
-        
-        name_counts = Counter(names)
-        stats['valid'] = True
-        stats['total_encodings'] = len(encodings)
-        stats['unique_persons'] = len(name_counts)
-        stats['avg_encodings_per_person'] = len(encodings) / len(name_counts)
-        stats['persons'] = dict(name_counts)
-        
-        if verbose:
-            print(f"✅ Fichier d'encodages valide:")
-            print(f"   - {stats['total_encodings']} encodages total")
-            print(f"   - {stats['unique_persons']} personnes uniques")
-            print(f"   - Moyenne: {stats['avg_encodings_per_person']:.1f} encodages par personne")
-            
-            print("\n📊 Répartition:")
-            for name, count in name_counts.most_common():
-                print(f"   - {name}: {count} encodages")
-        
-        return stats
-        
-    except Exception as e:
-        if verbose:
-            print(f"❌ Erreur lors de la validation: {e}")
-        return stats
-
-def fetch_saved_cameras():
-    """Récupère les caméras sauvegardées depuis la base de données"""
-    try:
-        response = requests.get(f"{BACKEND_URL}/api/cameras", timeout=10)
-        if response.status_code == 200:
-            cameras = response.json()
-            print(f"✅ {len(cameras)} caméra(s) récupérée(s) depuis la base de données")
-            return cameras
-        else:
-            print(f"❌ Erreur API caméras: {response.status_code}")
-            return []
-    except Exception as e:
-        print(f"❌ Erreur lors de la récupération des caméras: {e}")
-        return []
-
-def build_camera_url(camera):
-    """Construit l'URL complète d'une caméra depuis les données de la DB"""
-    try:
-        ip = camera.get('ip')
-        port = camera.get('port', 8080)
-        username = camera.get('username', '')
-        password = camera.get('password', '')
-        
-        if not ip:
-            return None
-            
-        # Construire l'URL avec ou sans authentification
-        if username and password:
-            url = f"http://{username}:{password}@{ip}:{port}/video"
-        else:
-            url = f"http://{ip}:{port}/video"
-            
-        return url
-    except Exception as e:
-        print(f"❌ Erreur construction URL caméra: {e}")
-        return None
-
-def validate_encodings_with_database():
-    """Validate that encoded students exist in the database"""
-    try:
-        response = requests.get(f"{BACKEND_URL}/api/students", timeout=10)
-        if response.status_code == 200:
-            students = response.json()
-            active_matricules = set(str(student.get('matricule')) for student in students if student.get('matricule'))
-            
-            # Check how many encoded students are still active
-            encoded_students = set(str(name) for name in known_names)
-            active_encoded = encoded_students.intersection(active_matricules)
-            inactive_encoded = encoded_students - active_matricules
-            
-            print(f"📊 Validation des encodages avec la base de données:")
-            print(f"   Étudiants encodés: {len(encoded_students)}")
-            print(f"   Étudiants actifs en DB: {len(active_matricules)}")
-            print(f"   Encodages valides: {len(active_encoded)}")
-            
-            if inactive_encoded:
-                print(f"⚠️  Encodages obsolètes détectés: {len(inactive_encoded)} étudiants")
-                print(f"   Étudiants supprimés: {', '.join(sorted(list(inactive_encoded)))}")
-                print(f"💡 Recommandation: Exécutez 'python sync_encodings_with_db.py' pour nettoyer")
-                return False
-            else:
-                print(f"✅ Tous les encodages correspondent à des étudiants actifs")
-                return True
-        else:
-            print(f"⚠️  Impossible de valider avec la DB (erreur {response.status_code})")
-            return True  # Continue anyway
-    except Exception as e:
-        print(f"⚠️  Erreur validation DB: {e}")
-        return True  # Continue anyway
-
-# 📂 Dossiers requis
-os.makedirs(UNKNOWN_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-# 🤖 Initialize InsightFace Model (RetinaFace + ArcFace)
-print("🔧 Initializing InsightFace models (RetinaFace + ArcFace)...")
-face_app = None
-
-def initialize_insightface():
-    """Initialize InsightFace FaceAnalysis model"""
-    global face_app
-    try:
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
-        
-        face_app = FaceAnalysis(
-            name=INSIGHTFACE_MODEL,
-            providers=providers
-        )
-        face_app.prepare(ctx_id=0 if USE_GPU else -1, det_size=DET_SIZE, det_thresh=DET_THRESH)
-        
-        print(f"✅ InsightFace initialized successfully!")
-        print(f"   Model: {INSIGHTFACE_MODEL}")
-        print(f"   Providers: {providers}")
-        print(f"   Detection size: {DET_SIZE}")
-        print(f"   Detection threshold: {DET_THRESH}")
-        print(f"   Recognition threshold: {REC_THRESH}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to initialize InsightFace: {e}")
-        print("   Please run: pip install insightface onnxruntime")
-        return False
-
-# Initialize at startup
-if not initialize_insightface():
-    print("⚠️  Warning: InsightFace not initialized. Face recognition will not work.")
-
-# 🔍 Scene Change Detection Settings
-SCENE_CHANGE_THRESHOLD = 15.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
-SCENE_CHANGE_MIN_CONTOUR_AREA = 300  # Minimum contour area to consider for change - reduced for sensitivity
-ENABLE_SCENE_CHANGE_DETECTION = True  # Enable/disable scene change detection
-SCENE_CHANGE_PIXEL_THRESHOLD = 20.0  # Threshold for mean pixel difference method
-
-def detect_scene_change(prev_frame, curr_frame, threshold=SCENE_CHANGE_THRESHOLD):
-    """
-    Detect if there's significant change between two frames to determine if processing is needed.
-    Returns True if significant change is detected, False otherwise.
-    """
-    if prev_frame is None:
-        return True  # Always process the first frame
-    
-    try:
-        # Convert frames to grayscale for faster processing
-        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-        curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-        
-        # Apply Gaussian blur to reduce noise
-        prev_blur = cv2.GaussianBlur(prev_gray, (21, 21), 0)
-        curr_blur = cv2.GaussianBlur(curr_gray, (21, 21), 0)
-        
-        # Calculate absolute difference
-        frame_diff = cv2.absdiff(prev_blur, curr_blur)
-        
-        # Apply threshold to get binary image
-        _, thresh = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
-        
-        # Find contours of changed regions
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Calculate total area of change
-        total_change_area = 0
-        significant_contours = 0
-        
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > SCENE_CHANGE_MIN_CONTOUR_AREA:
-                total_change_area += area
-                significant_contours += 1
-        
-        # Calculate percentage of frame that changed
-        frame_area = prev_frame.shape[0] * prev_frame.shape[1]
-        change_percentage = (total_change_area / frame_area) * 100
-        
-        # Alternative method: simple pixel difference
-        mean_diff = np.mean(frame_diff)
-        
-        # Decision logic: significant change if either method indicates change
-        has_significant_change = (change_percentage > threshold) or (mean_diff > SCENE_CHANGE_PIXEL_THRESHOLD)
-        
-        return has_significant_change
-        
-    except Exception as e:
-        print(f"⚠️ Error in scene change detection: {e}")
-        return True  # Default to processing if detection fails
-
-def encode_student_locally(student_data):
-    """Encode a single student locally by downloading their photos and processing them"""
-    try:
-        matricule = str(student_data.get('matricule'))
-        student_id = student_data.get('_id')
-        photos = student_data.get('photos', [])
-        
-        if not matricule or not photos:
-            print(f"⚠️  Étudiant {matricule} n'a pas de photos")
-            return False
-        
-        print(f"🧠 Encodage local de l'étudiant {matricule}...")
-        
-        # Create student directory in dataset
-        dataset_dir = "dataset"
-        student_dir = os.path.join(dataset_dir, matricule)
-        os.makedirs(student_dir, exist_ok=True)
-        
-        # Download and save student photos
-        photos_saved = 0
-        for i, photo_url in enumerate(photos):
-            try:
-                # If it's a local path, copy it directly
-                if photo_url.startswith('uploads/'):
-                    local_path = os.path.join("..", "..", "backend", photo_url)
-                    if os.path.exists(local_path):
-                        photo_name = f"{matricule}_{i + 1}{os.path.splitext(photo_url)[1]}"
-                        dest_path = os.path.join(student_dir, photo_name)
-                        shutil.copy2(local_path, dest_path)
-                        photos_saved += 1
-                        print(f"   📸 Photo {i+1} copiée: {photo_name}")
-                else:
-                    # Download from URL
-                    response = requests.get(photo_url, timeout=10)
-                    if response.status_code == 200:
-                        photo_name = f"{matricule}_{i + 1}.jpg"
-                        dest_path = os.path.join(student_dir, photo_name)
-                        with open(dest_path, 'wb') as f:
-                            f.write(response.content)
-                        photos_saved += 1
-                        print(f"   📸 Photo {i+1} téléchargée: {photo_name}")
-            
-            except Exception as e:
-                print(f"   ⚠️  Erreur avec la photo {i+1}: {e}")
-        
-        if photos_saved == 0:
-            print(f"❌ Aucune photo n'a pu être sauvegardée pour {matricule}")
-            return False
-        
-        print(f"✅ {photos_saved} photo(s) sauvegardée(s) pour {matricule}")
-        
-        # Now encode the faces using the local function
-        success = encode_faces_from_dataset_local()
-        
-        if success:
-            print(f"✅ Encodage réussi pour l'étudiant {matricule}")
-            return True
-        else:
-            print(f"❌ Échec de l'encodage pour l'étudiant {matricule}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Erreur lors de l'encodage local de l'étudiant {matricule}: {e}")
-        return False
-
-def encode_faces_from_dataset_local():
-    """Encode faces from dataset directory structure - local version"""
-    print("🔄 Encodage des visages depuis le dataset...")
-    
-    dataset_dir = "dataset"
-    
-    # Create dataset directory if it doesn't exist
-    os.makedirs(dataset_dir, exist_ok=True)
-    
-    # Check if dataset has any directories
-    if not os.path.exists(dataset_dir) or not os.listdir(dataset_dir):
-        print("❌ Aucun étudiant trouvé dans le répertoire dataset")
-        return False
-    
-    # Load existing encodings 
-    known_encodings, known_names, _ = load_existing_encodings_local()
-    total_faces_encoded = 0
-    total_students = 0
-
-    for person_name in sorted(os.listdir(dataset_dir)):
-        person_dir = os.path.join(dataset_dir, person_name)
-        if not os.path.isdir(person_dir):
-            continue
-            
-        total_students += 1
-        student_faces = 0
-        
-        print(f"📸 Traitement de l'étudiant: {person_name}")
-        
-        for image_name in os.listdir(person_dir):
-            if not image_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
-                continue
-                
-            image_path = os.path.join(person_dir, image_name)
-            try:
-                # Load and process image with InsightFace
-                image = cv2.imread(image_path)
-                if image is None:
-                    print(f"⚠️  Impossible de charger {image_name}")
-                    continue
-                
-                # Detect faces with RetinaFace
-                faces = face_app.get(image)
-                
-                if not faces or len(faces) == 0:
-                    print(f"⚠️  Aucun visage trouvé dans {image_name}")
-                    continue
-                
-                # Get face embeddings (ArcFace)
-                for face in faces:
-                    # Get embedding and normalize it
-                    embedding = np.asarray(face.embedding, dtype=np.float32)
-                    norm = np.linalg.norm(embedding)
-                    if norm > 0:
-                        embedding = embedding / norm
-                    
-                    known_encodings.append(embedding)
-                    known_names.append(person_name)
-                    total_faces_encoded += 1
-                    student_faces += 1
-                    
-                print(f"   ✅ {image_name}: {len(faces)} visage(s) encodé(s)")
-                
-            except Exception as e:
-                print(f"   ❌ Erreur lors du traitement de {image_name}: {e}")
-        
-        print(f"   📊 {person_name}: {student_faces} visages encodés au total")
-
-    print(f"\n📈 Encodage terminé:")
-    print(f"   - Étudiants traités: {total_students}")
-    print(f"   - Visages encodés au total: {total_faces_encoded}")
-    print(f"   - Étudiants uniques: {len(set(known_names))}")
-
-    if known_encodings and total_faces_encoded > 0:
-        # Save encodings
-        data = {
-            'encodings': known_encodings,
-            'names': known_names,
-            'created_at': time.strftime("%Y-%m-%d %H:%M:%S"),
-            'total_faces': total_faces_encoded,
-            'unique_students': len(set(known_names))
-        }
-        
-        with open(ENCODINGS_FILE, 'wb') as f:
-            pickle.dump(data, f)
-            
-        print(f"✅ Encodages sauvegardés dans {ENCODINGS_FILE}")
-        return True
-    else:
-        print("❌ Aucun visage n'a été encodé avec succès")
-        return False
-
-def load_existing_encodings_local():
-    """Load existing encodings - local version with normalization"""
-    try:
-        with open(ENCODINGS_FILE, 'rb') as f:
-            data = pickle.load(f)
-        
-        # Ensure embeddings are normalized
-        encodings = data.get('encodings', [])
-        normalized_encodings = []
-        for enc in encodings:
-            emb = np.asarray(enc, dtype=np.float32)
-            norm = np.linalg.norm(emb)
-            if norm > 0:
-                emb = emb / norm
-            normalized_encodings.append(emb)
-        
-        return normalized_encodings, data.get('names', []), data.get('processed_images', {})
-    except:
-        return [], [], {}
-
 def create_default_encodings_file():
     """Create a default encodings.pkl file if it doesn't exist."""
     try:
@@ -536,6 +203,111 @@ def create_default_encodings_file():
 if not os.path.exists(ENCODINGS_FILE):
     print(f"⚠️  Encodings file not found: {ENCODINGS_FILE}. Creating a default file.")
     create_default_encodings_file()
+
+# 📂 Dossiers requis
+os.makedirs(UNKNOWN_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# Create detected faces directory
+DETECTED_FACES_DIR = os.path.join(os.getenv("UNKNOWN_FACES_DIR", "unknown_faces"), "all_detected")
+os.makedirs(DETECTED_FACES_DIR, exist_ok=True)
+
+# 🤖 Initialize InsightFace Model (SCRFD + ArcFace)
+print("🔧 Initializing InsightFace models (SCRFD + ArcFace)...")
+face_app = None
+esrgan_upsampler = None
+
+def initialize_esrgan():
+    """Initialize Real-ESRGAN upsampler for image enhancement"""
+    global esrgan_upsampler
+    
+    if not ENABLE_ESRGAN:
+        print("ℹ️  ESRGAN disabled - using OpenCV enhancement only")
+        return False
+    
+    if not ESRGAN_AVAILABLE:
+        print("⚠️  ESRGAN libraries not installed - falling back to OpenCV enhancement")
+        return False
+    
+    try:
+        print("🔧 Initializing Real-ESRGAN...")
+        
+        # Define model architecture (RealESRGAN_x2plus uses RRDBNet)
+        model = RRDBNet(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_block=23,
+            num_grow_ch=32,
+            scale=ESRGAN_SCALE
+        )
+        
+        # Initialize upsampler
+        esrgan_upsampler = RealESRGANer(
+            scale=ESRGAN_SCALE,
+            model_path=ESRGAN_MODEL_PATH,
+            model=model,
+            tile=400,  # Process in tiles to save memory
+            tile_pad=10,
+            pre_pad=0,
+            half=False  # Set to True if using GPU with FP16 support
+        )
+        
+        print(f"✅ Real-ESRGAN initialized successfully!")
+        print(f"   Model: {ESRGAN_MODEL_PATH}")
+        print(f"   Scale: {ESRGAN_SCALE}x upscaling")
+        print(f"   Tile size: 400x400 (memory efficient)")
+        return True
+        
+    except FileNotFoundError:
+        print(f"❌ ESRGAN model file not found: {ESRGAN_MODEL_PATH}")
+        print("   Download from: https://github.com/xinntao/Real-ESRGAN/releases")
+        print("   Recommended: RealESRGAN_x2plus.pth (for 2x upscaling)")
+        print("   Falling back to OpenCV enhancement")
+        return False
+    except Exception as e:
+        print(f"❌ Failed to initialize Real-ESRGAN: {e}")
+        print("   Falling back to OpenCV enhancement")
+        return False
+
+def initialize_insightface():
+    """Initialize InsightFace FaceAnalysis model with RetinaFace detector"""
+    global face_app
+    try:
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
+        
+        # buffalo_l uses RetinaFace (more accurate) instead of SCRFD
+        face_app = FaceAnalysis(
+            name=INSIGHTFACE_MODEL,
+            providers=providers
+        )
+        # Configure for better detection on full frames
+        face_app.prepare(
+            ctx_id=0 if USE_GPU else -1, 
+            det_size=DET_SIZE,  # Detection resolution
+            det_thresh=DET_THRESH  # Lower threshold for better detection
+        )
+        
+        print(f"✅ InsightFace initialized successfully!")
+        print(f"   Model: {INSIGHTFACE_MODEL} (RetinaFace detector)")
+        print(f"   Providers: {providers}")
+        print(f"   Detection size: {DET_SIZE}")
+        print(f"   Detection threshold: {DET_THRESH} (lower = more sensitive)")
+        print(f"   Recognition threshold: {REC_THRESH}")
+        print(f"   Min face size: {MIN_FACE_SIZE}px")
+        print(f"   🎯 RetinaFace provides high accuracy detection!")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to initialize InsightFace: {e}")
+        print("   Please run: pip install insightface onnxruntime")
+        return False
+
+# Initialize at startup
+if not initialize_insightface():
+    print("⚠️  Warning: InsightFace not initialized. Face recognition will not work.")
+
+# Initialize ESRGAN if enabled
+esrgan_enabled = initialize_esrgan()
 
 # 🧠 Global variables for encodings (initialized later)
 known_encodings = []
@@ -577,84 +349,14 @@ def initialize_encodings():
             for name, count in sorted(name_counts.items()):
                 print(f"     • {name}: {count} encoding(s)")
                 
-        validation_stats = validate_encodings(verbose=True)
-        if not validation_stats['valid']:
+        if not known_encodings:
             print("⚠️  Encodages non valides ou vides. Le système démarrera en mode attente.")
             print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages.")
             known_encodings = []
             known_names = []
         else:
-            print(f"✅ {len(known_encodings)} encodages chargés pour {validation_stats['unique_persons']} personnes.")
+            print(f"✅ {len(known_encodings)} encodages chargés pour {len(set(known_names))} personnes.")
 
-        # Validate encodings against database and auto-sync if needed
-        try:
-            response = requests.get(f"{BACKEND_URL}/api/students", timeout=10)
-            if response.status_code == 200:
-                students = response.json()
-                active_matricules = set(str(student.get('matricule')) for student in students if student.get('matricule'))
-                encoded_students = set(str(name) for name in known_names)
-                active_encoded = encoded_students.intersection(active_matricules)
-                inactive_encoded = encoded_students - active_matricules
-                unencoded_students = active_matricules - encoded_students
-                
-                print(f"📊 Validation des encodages avec la base de données:")
-                print(f"   Étudiants encodés: {len(encoded_students)}")
-                print(f"   Étudiants actifs en DB: {len(active_matricules)}")
-                print(f"   Encodages valides: {len(active_encoded)}")
-                
-                # Handle inactive encodings (students removed from DB)
-                if inactive_encoded:
-                    print(f"⚠️  Encodages obsolètes détectés: {len(inactive_encoded)} étudiants")
-                    print(f"   Étudiants supprimés: {', '.join(sorted(list(inactive_encoded)))}")
-                    print(f"💡 Synchronisation automatique des encodages...")
-                    # Use local path for sync script
-                    sync_script_path = os.path.join(os.path.dirname(__file__), "..", "..","docker-setup", "sync_encodings_with_db.py")
-                    os.system(f"python {sync_script_path}")
-                    # Reload encodings after sync - ✅ Utiliser 'embeddings'
-                    with open(ENCODINGS_FILE, "rb") as f:
-                        data = pickle.load(f)
-                        known_encodings = data.get("embeddings", [])
-                        known_names = data.get("names", [])
-                    print(f"✅ Encodages synchronisés et rechargés.")
-                
-                # Handle unencoded students (new students in DB without encodings)
-                elif unencoded_students:
-                    print(f"⚠️  Nouveaux étudiants détectés: {len(unencoded_students)} étudiants")
-                    print(f"   Étudiants à encoder: {', '.join(sorted(list(unencoded_students)))}")
-                    print(f"💡 Encodage automatique des nouveaux étudiants...")
-                    
-                    # Encode each unencoded student locally
-                    for matricule in unencoded_students:
-                        try:
-                            # Find the student details
-                            student_data = next((s for s in students if str(s.get('matricule')) == matricule), None)
-                            if student_data:
-                                success = encode_student_locally(student_data)
-                                if success:
-                                    print(f"✅ Encodage réussi pour l'étudiant {matricule}")
-                                else:
-                                    print(f"❌ Échec encodage pour l'étudiant {matricule}")
-                            else:
-                                print(f"⚠️  Impossible de trouver les détails de l'étudiant {matricule}")
-                        except Exception as e:
-                            print(f"❌ Erreur lors de l'encodage de l'étudiant {matricule}: {e}")
-                    
-                    # Reload encodings after encoding new students
-                    try:
-                        with open(ENCODINGS_FILE, "rb") as f:
-                            data = pickle.load(f)
-                            known_encodings = data["encodings"]
-                            known_names = data["names"]
-                        print(f"✅ Encodages rechargés après ajout de nouveaux étudiants")
-                    except Exception as e:
-                        print(f"⚠️  Impossible de recharger les encodages: {e}")
-                
-                else:
-                    print(f"✅ Tous les encodages correspondent à des étudiants actifs")
-            else:
-                print(f"⚠️  Impossible de valider avec la DB (erreur {response.status_code})")
-        except Exception as e:
-            print(f"⚠️  Erreur validation DB: {e}")
     except FileNotFoundError:
         print("⚠️  Fichier encodings.pkl non trouvé. Le système démarrera en mode attente.")
         print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages automatiquement.")
@@ -672,7 +374,6 @@ last_recognition = {}
 frame_count = 0
 previous_frames = {}  # Store previous frames for each camera for scene change detection
 
-
 # Configuration WebSocket
 ws = None
 ws_connected = False
@@ -680,12 +381,6 @@ ws_reconnect_attempts = 0
 max_reconnect_attempts = 10
 reconnect_interval = 5
 ws_lock = Lock()
-
-# Camera management
-camera_caps = {}
-camera_configs = {}
-camera_lock = Lock()
-camera_check_interval = 30  # Check for camera changes every 30 seconds
 
 # Shutdown event for clean thread exit
 shutdown_event = threading.Event()
@@ -714,9 +409,6 @@ def on_close(ws, close_status_code, close_msg):
     global ws_connected
     with ws_lock:
         ws_connected = False
-    # Attempt to reconnect
-    if not shutdown_event.is_set():
-        threading.Thread(target=reconnect_websocket, daemon=True).start()
 
 def on_open(ws):
     print("✅ Connexion WebSocket établie")
@@ -724,30 +416,6 @@ def on_open(ws):
     with ws_lock:
         ws_connected = True
         ws_reconnect_attempts = 0
-
-def reconnect_websocket():
-    """Reconnect WebSocket with exponential backoff"""
-    global ws, ws_connected, ws_reconnect_attempts
-    
-    while not shutdown_event.is_set() and ws_reconnect_attempts < max_reconnect_attempts:
-        try:
-            ws_reconnect_attempts += 1
-            wait_time = min(reconnect_interval * (2 ** (ws_reconnect_attempts - 1)), 60)
-            print(f"🔄 Tentative de reconnexion WebSocket #{ws_reconnect_attempts} dans {wait_time}s...")
-            
-            time.sleep(wait_time)
-            
-            if shutdown_event.is_set():
-                break
-                
-            connect_websocket()
-            break
-            
-        except Exception as e:
-            print(f"❌ Erreur lors de la reconnexion WebSocket: {e}")
-    
-    if ws_reconnect_attempts >= max_reconnect_attempts:
-        print(f"❌ Échec de la reconnexion WebSocket après {max_reconnect_attempts} tentatives")
 
 def connect_websocket():
     """Établit la connexion WebSocket"""
@@ -785,16 +453,13 @@ def send_websocket_message(message):
                 if ws_connected and ws:
                     ws.send(json.dumps(message))
                     return True
-                else:
-                    if attempt == 0:  # Only trigger reconnection on first attempt
-                        threading.Thread(target=reconnect_websocket, daemon=True).start()
         except Exception as e:
             print(f"❌ Erreur envoi WebSocket (tentative {attempt + 1}): {e}")
             with ws_lock:
                 ws_connected = False
             
             if attempt < max_retries - 1:
-                time.sleep(1)  # Wait before retry
+                time.sleep(1)
                 
     return False
 
@@ -850,18 +515,80 @@ def log_attendance(student_id, camera_type, confidence):
     else:
         print("❌ Échec envoi WebSocket")
 
-def save_unknown_face(frame, face_location):
-    """Sauvegarde un visage inconnu"""
+def save_unknown_face(frame, face_location, confidence=0.0):
+    """
+    Sauvegarde un visage inconnu avec filtres de qualité
+    Ne sauvegarde que les visages de bonne qualité (pas trop petits, pas flous, bonne confiance)
+    """
     top, right, bottom, left = face_location
+    face_width = right - left
+    face_height = bottom - top
+    
+    # 🔍 QUALITY FILTERS - Only save high-quality unknown faces
+    
+    # Filter 1: Minimum size (avoid tiny/far faces)
+    MIN_UNKNOWN_FACE_SIZE = 80  # pixels (much larger than MIN_FACE_SIZE)
+    if face_width < MIN_UNKNOWN_FACE_SIZE or face_height < MIN_UNKNOWN_FACE_SIZE:
+        print(f"   ⏭️  Unknown face NOT saved - too small ({face_width}x{face_height}px < {MIN_UNKNOWN_FACE_SIZE}px)")
+        return
+    
+    # Filter 2: Aspect ratio (avoid weird crops)
+    aspect_ratio = face_width / face_height
+    if aspect_ratio < 0.7 or aspect_ratio > 1.5:
+        print(f"   ⏭️  Unknown face NOT saved - bad aspect ratio ({aspect_ratio:.2f})")
+        return
+    
+    # Filter 3: Minimum confidence (detection confidence should be decent)
+    MIN_UNKNOWN_CONFIDENCE = 0.5  # Only save faces detected with >50% confidence
+    if confidence < MIN_UNKNOWN_CONFIDENCE:
+        print(f"   ⏭️  Unknown face NOT saved - low detection confidence ({confidence:.2f} < {MIN_UNKNOWN_CONFIDENCE})")
+        return
+    
+    # Filter 4: Check if face is too close to image edge (likely cropped)
+    frame_height, frame_width = frame.shape[:2]
+    edge_margin = 20  # pixels from edge
+    if (left < edge_margin or top < edge_margin or 
+        right > frame_width - edge_margin or bottom > frame_height - edge_margin):
+        print(f"   ⏭️  Unknown face NOT saved - too close to frame edge (likely cropped)")
+        return
+    
+    # Extract face
     face_image = frame[top:bottom, left:right]
     
+    # Filter 5: Blur detection using Laplacian variance
+    gray_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
+    laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+    MIN_BLUR_THRESHOLD = 100  # Higher = sharper
+    if laplacian_var < MIN_BLUR_THRESHOLD:
+        print(f"   ⏭️  Unknown face NOT saved - too blurry (variance: {laplacian_var:.1f} < {MIN_BLUR_THRESHOLD})")
+        return
+    
+    # All filters passed - save the face
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
-    filename = f"{unknown_id}_{timestamp}.jpg"
+    filename = f"{unknown_id}_{timestamp}_size{face_width}x{face_height}_sharp{laplacian_var:.0f}.jpg"
     filepath = os.path.join(UNKNOWN_DIR, filename)
     
     cv2.imwrite(filepath, face_image)
-    print(f"💾 Visage inconnu sauvegardé: {filename}")
+    print(f"💾 Unknown face saved: {filename} (Quality checks: ✅ Size ✅ Ratio ✅ Confidence ✅ Position ✅ Sharpness)")
+
+def save_detected_face(frame, face_location, label="detected", confidence=0.0):
+    """Save every detected face to the detected_faces directory"""
+    try:
+        top, right, bottom, left = face_location
+        face_image = frame[top:bottom, left:right]
+        
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # milliseconds
+        face_id = f"{label}_{hash(str(face_location)) % 100000000:08x}"
+        filename = f"{face_id}_{timestamp}_conf{confidence:.2f}.jpg"
+        filepath = os.path.join(DETECTED_FACES_DIR, filename)
+        
+        cv2.imwrite(filepath, face_image)
+        print(f"💾 Face sauvegardée: {filename}")
+        return filepath
+    except Exception as e:
+        print(f"❌ Erreur sauvegarde face détectée: {e}")
+        return None
 
 def listen_for_quit():
     """Écoute les commandes clavier pour quitter"""
@@ -869,461 +596,263 @@ def listen_for_quit():
         try:
             user_input = input().strip().lower()
             if user_input in ['q', 'quit', 'exit']:
-                print("🛑 Arrêt demandé par l'utilisateur")
+                print("🛑 Commande d'arrêt reçue")
                 shutdown_event.set()
                 break
         except:
             pass
 
-def initialize_single_camera(camera_config):
-    """Initialize a single camera - to be used in parallel processing"""
-    camera_id = camera_config.get('_id', 'unknown')
-    camera_name = camera_config.get('name', f'Camera-{camera_id}')
-    camera_type = camera_config.get('type', 'entry')
-    camera_url = build_camera_url(camera_config)
-    
-    if not camera_url:
-        print(f"❌ URL invalide pour la caméra {camera_name}")
-        return None
+def initialize_single_camera():
+    """Initialize the single hardcoded camera"""
+    print(f"🔄 Tentative de connexion à la caméra {SINGLE_CAMERA_NAME}...")
+    print(f"   URL: {SINGLE_CAMERA_URL}")
+    print(f"   Type: {SINGLE_CAMERA_TYPE}")
     
     try:
-        print(f"🔄 Tentative de connexion à la caméra {camera_name} ({camera_type})...")
-        
-        if isinstance(camera_url, str):
-            cap = cv2.VideoCapture(camera_url, cv2.CAP_FFMPEG)
-        else:
-            cap = cv2.VideoCapture(camera_url)
+        cap = cv2.VideoCapture(SINGLE_CAMERA_URL, cv2.CAP_FFMPEG)
 
         if cap.isOpened():
             # Set camera properties for better far face detection
-            # Higher resolution for security cameras
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)   # 1080p width
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)  # 1080p height
-            cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)             # Reasonable FPS for processing
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)       # Minimize latency
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+            cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             ret, frame = cap.read()
             if ret:
-                # Verify the frame has reasonable dimensions
                 height, width = frame.shape[:2]
-                if width >= 1280 and height >= 720:  # At least 720p
-                    print(f"✅ Caméra {camera_name} connectée avec succès ({width}x{height})")
-                    return {
-                        'id': camera_id,
-                        'name': camera_name,
-                        'type': camera_type,
-                        'url': camera_url,
-                        'cap': cap,
-                        'config': camera_config,
-                        'resolution': (width, height)
-                    }
-                else:
-                    print(f"⚠️ Résolution insuffisante pour {camera_name}: {width}x{height}, utilisation quand même")
-                    return {
-                        'id': camera_id,
-                        'name': camera_name,
-                        'type': camera_type,
-                        'url': camera_url,
-                        'cap': cap,
-                        'config': camera_config,
-                        'resolution': (width, height)
-                    }
+                print(f"✅ Caméra {SINGLE_CAMERA_NAME} initialisée")
+                print(f"   Résolution: {width}x{height}")
+                
+                return {
+                    'cap': cap,
+                    'name': SINGLE_CAMERA_NAME,
+                    'type': SINGLE_CAMERA_TYPE,
+                    'url': SINGLE_CAMERA_URL
+                }
             else:
-                print(f"❌ Impossible de lire depuis la caméra {camera_name}")
+                print(f"❌ Impossible de lire une frame de la caméra {SINGLE_CAMERA_NAME}")
                 cap.release()
         else:
-            print(f"❌ Impossible d'ouvrir la caméra {camera_name}")
+            print(f"❌ Impossible d'ouvrir la caméra {SINGLE_CAMERA_NAME}")
             cap.release()
                 
     except Exception as e:
-        print(f"❌ Erreur avec la caméra {camera_name}: {e}")
+        print(f"❌ Erreur avec la caméra {SINGLE_CAMERA_NAME}: {e}")
         
     return None
 
-def initialize_cameras():
-    """Initialize all cameras in parallel and return camera objects"""
-    global camera_caps, camera_configs
-    
-    # Fetch saved cameras from database
-    saved_cameras = fetch_saved_cameras()
-    active_cameras = [cam for cam in saved_cameras if cam.get('status') == 'active']
-    
-    if not active_cameras:
-        print("⚠️  Aucune caméra active trouvée en base de données")
-        return {}
-    
-    print(f"🔄 Initialisation parallèle de {len(active_cameras)} caméra(s)...")
-    
-    # Use ThreadPoolExecutor for parallel camera initialization
-    camera_results = {}
-    with ThreadPoolExecutor(max_workers=min(len(active_cameras), 10)) as executor:
-        # Submit all camera initialization tasks
-        future_to_camera = {
-            executor.submit(initialize_single_camera, camera): camera 
-            for camera in active_cameras
-        }
-        
-        # Collect results as they complete
-        for future in as_completed(future_to_camera):
-            camera_config = future_to_camera[future]
-            try:
-                result = future.result()
-                if result:
-                    camera_id = result['id']
-                    camera_results[camera_id] = result
-                    print(f"✅ Caméra {result['name']} ({result['type']}) initialisée")
-                else:
-                    print(f"❌ Échec d'initialisation de la caméra {camera_config.get('name', 'Unknown')}")
-            except Exception as e:
-                print(f"❌ Exception lors de l'initialisation de la caméra {camera_config.get('name', 'Unknown')}: {e}")
-    
-    # Update global camera storage
-    with camera_lock:
-        # Close existing cameras that are no longer active
-        for cam_id, cam_data in camera_caps.items():
-            if cam_id not in camera_results:
-                print(f"🔄 Fermeture de la caméra supprimée: {cam_data.get('name', cam_id)}")
-                if cam_data.get('cap'):
-                    cam_data['cap'].release()
-        
-        camera_caps = {cam_id: cam_data for cam_id, cam_data in camera_results.items()}
-        camera_configs = {cam_id: cam_data['config'] for cam_id, cam_data in camera_results.items()}
-    
-    print(f"✅ {len(camera_results)} caméra(s) initialisée(s) avec succès")
-    return camera_results
-
-def camera_monitor():
-    """Monitor database for camera changes and reinitialize if needed"""
-    global camera_caps, camera_configs
-    last_camera_hash = None
-    
-    while not shutdown_event.is_set():
-        try:
-            # Fetch current cameras from database
-            current_cameras = fetch_saved_cameras()
-            active_cameras = [cam for cam in current_cameras if cam.get('status') == 'active']
-            
-            # Create a hash of camera configurations for comparison
-            camera_hash = hash(json.dumps(sorted([
-                {
-                    'id': cam.get('_id'),
-                    'name': cam.get('name'),
-                    'type': cam.get('type'),
-                    'ip': cam.get('ip'),
-                    'port': cam.get('port'),
-                    'status': cam.get('status')
-                } for cam in active_cameras
-            ], key=lambda x: x['id']), sort_keys=True))
-            
-            # Check if cameras have changed
-            if last_camera_hash is not None and camera_hash != last_camera_hash:
-                print("🔄 Changement détecté dans la configuration des caméras - reinitialisation...")
-                initialize_cameras()
-            
-            last_camera_hash = camera_hash
-            
-        except Exception as e:
-            print(f"❌ Erreur lors de la surveillance des caméras: {e}")
-        
-        # Wait before next check
-        shutdown_event.wait(camera_check_interval)
-
-# === Encodings reload logic ===
-
-class EncodingFileHandler(FileSystemEventHandler):
-    """Handler for monitoring changes to the encodings file"""
-    
-    def __init__(self):
-        super().__init__()
-        self.last_modified = 0
-        self.cooldown_period = 2  # Prevent rapid successive reloads
-    
-    def on_modified(self, event):
-        if event.is_directory:
-            return
-            
-        # Check if it's the encodings file
-        if os.path.abspath(event.src_path) == os.path.abspath(ENCODINGS_FILE):
-            current_time = time.time()
-            
-            # Prevent rapid successive reloads with cooldown period
-            if current_time - self.last_modified < self.cooldown_period:
-                return
-                
-            self.last_modified = current_time
-            print(f"🔄 Encodings file modified: {event.src_path}")
-            reload_encodings()
-    
-    def on_created(self, event):
-        # Handle case where encodings file is created
-        if not event.is_directory and os.path.abspath(event.src_path) == os.path.abspath(ENCODINGS_FILE):
-            print(f"✅ Encodings file created: {event.src_path}")
-            reload_encodings()
-
-def reload_encodings():
-    """Reload encodings from the file in a thread-safe manner"""
-    global known_encodings, known_names
-    try:
-        if not os.path.exists(ENCODINGS_FILE):
-            print(f"⚠️  Encodings file not found: {ENCODINGS_FILE}. Using empty encodings.")
-            with encodings_lock:
-                known_encodings = []
-                known_names = []
-            return
-
-        new_encodings, new_names = load_encodings()
-        
-        with encodings_lock:
-            known_encodings = new_encodings
-            known_names = new_names
-            
-        if new_encodings:
-            print(f"✅ Encodings reloaded at {time.strftime('%Y-%m-%d %H:%M:%S')} - {len(new_encodings)} encodings loaded")
-        else:
-            print(f"⚠️  Encodings file empty or invalid at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            
-    except Exception as e:
-        print(f"❌ Error reloading encodings: {e}")
-
-def start_encodings_watcher():
-    """Start the watchdog observer to monitor the encodings file"""
-    try:
-        event_handler = EncodingFileHandler()
-        observer = Observer()
-        
-        # Watch the directory containing the encodings file
-        watch_directory = os.path.dirname(os.path.abspath(ENCODINGS_FILE))
-        if not os.path.exists(watch_directory):
-            os.makedirs(watch_directory, exist_ok=True)
-            print(f"📁 Created encodings directory: {watch_directory}")
-        
-        observer.schedule(event_handler, path=watch_directory, recursive=False)
-        observer.start()
-        
-        print(f"👀 Started file watcher for encodings: {ENCODINGS_FILE}")
-        return observer
-        
-    except Exception as e:
-        print(f"❌ Failed to start encodings file watcher: {e}")
-        return None
-
-
-
-# Shared variables for encodings
-encodings_lock = threading.Lock()
-
-def initialize_file_watcher():
-    """Initialize the encodings file watcher - called only from main process"""
-    try:
-        encodings_observer = start_encodings_watcher()
-        return encodings_observer
-    except:
-        return None
-
-def process_camera_frame_multiprocess(camera_data):
-    """Process a single camera frame using multiprocessing"""
-    camera_id, cap, camera_type, camera_name, known_encodings, known_names, frame_count = camera_data
-    
-    try:
-        if not cap or not cap.isOpened():
-            return {'camera_id': camera_id, 'success': False, 'error': f"Caméra {camera_name} non disponible"}
-            
-        ret, frame = cap.read()
-        if ret:
-            # Process frame in separate process
-            frame_data = (frame, camera_type, camera_name, known_encodings, known_names, frame_count)
-            results = process_frame_multiprocess(frame_data)
-            return {'camera_id': camera_id, 'success': True, 'results': results, 'frame_processed': True}
-        else:
-            return {'camera_id': camera_id, 'success': False, 'error': f"Erreur lecture caméra {camera_name}"}
-            
-    except Exception as e:
-        return {'camera_id': camera_id, 'success': False, 'error': f"Erreur traitement caméra {camera_id}: {e}"}
-
-def process_camera_frame(camera_id, camera_data):
-    """Process a single camera frame - legacy function for thread compatibility"""
-    try:
-        cap = camera_data.get('cap')
-        camera_type = camera_data.get('type', 'entry')
-        camera_name = camera_data.get('name', f'Camera-{camera_id}')
-        
-        if not cap or not cap.isOpened():
-            print(f"❌ Caméra {camera_name} non disponible")
-            return False
-            
-        ret, frame = cap.read()
-        if ret:
-            # For legacy compatibility, we still process inline for now
-            with encodings_lock:
-                current_encodings = known_encodings
-                current_names = known_names
-            
-            global frame_count
-            frame_count += 1
-            
-            frame_data = (frame, camera_type, camera_name, current_encodings, current_names, frame_count)
-            results = process_frame_multiprocess(frame_data)
-            
-            # Process results
-            for result in results:
-                if result['type'] == 'recognition':
-                    name = result['name']
-                    confidence = result['confidence']
-                    current_time = result['timestamp']
-                    
-                    # Check for duplicate detection
-                    if name not in last_recognition or current_time - last_recognition[name] > 30:
-                        print(f"👤 {name} détecté sur caméra {camera_name} ({camera_type}) (confiance: {confidence:.2f})")
-                        log_attendance(name, camera_type, confidence)
-                        last_recognition[name] = current_time
-                        presence[name] = current_time
-                        
-                elif result['type'] == 'unknown_face':
-                    save_unknown_face_from_data(result)
-            
-            return True
-        else:
-            print(f"❌ Erreur lecture caméra {camera_name}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Erreur traitement caméra {camera_id}: {e}")
-        return False
-
-def save_unknown_face_from_data(result):
-    """Save unknown face from processed result data"""
-    try:
-        face_image = result['face_image']
-        face_location = result['face_location']
-        camera_name = result['camera_name']
-        
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
-        filename = f"{unknown_id}_{timestamp}.jpg"
-        filepath = os.path.join(UNKNOWN_DIR, filename)
-        
-        cv2.imwrite(filepath, face_image)
-        print(f"💾 Visage inconnu sauvegardé: {filename} (caméra: {camera_name})")
-    except Exception as e:
-        print(f"❌ Erreur sauvegarde visage inconnu: {e}")
-
 def enhance_image_for_face_detection(frame):
     """
-    Enhanced image preprocessing optimized for outdoor cameras with harsh sunlight
-    Handles: glare, overexposure, harsh shadows, high contrast, backlighting
+    Configurable image preprocessing for face detection
+    Speed: none (0ms) < fast (10-20ms) < balanced (50-100ms) < quality (500-700ms) < ESRGAN (very slow)
     """
-    # Step 1: Reduce glare and overexposure using white balance correction
-    # This helps with bright sunlight washing out faces
-    result = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-    avg_a = np.average(result[:, :, 1])
-    avg_b = np.average(result[:, :, 2])
-    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 0.3)
-    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 0.3)
-    balanced_frame = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    global esrgan_upsampler, esrgan_enabled
     
-    # Step 2: Apply bilateral filter to reduce noise while preserving edges
-    # Critical for outdoor cameras with varying light conditions
-    denoised = cv2.bilateralFilter(balanced_frame, 5, 50, 50)
+    # Try ESRGAN enhancement first if enabled (VERY SLOW)
+    if esrgan_enabled and esrgan_upsampler is not None:
+        try:
+            # Apply Real-ESRGAN super-resolution
+            enhanced_frame, _ = esrgan_upsampler.enhance(frame, outscale=ESRGAN_SCALE)
+            print(f"   🎨 ESRGAN enhancement applied ({ESRGAN_SCALE}x upscaling)")
+            return enhanced_frame
+        except Exception as e:
+            print(f"   ⚠️  ESRGAN failed: {e}, falling back to {ENHANCEMENT_LEVEL}")
+            # Continue to configured enhancement below
     
-    # Step 3: Convert to LAB color space for advanced contrast enhancement
-    lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    # No enhancement - use original frame
+    if ENHANCEMENT_LEVEL == "none":
+        print("   ⚡ No enhancement (original frame)")
+        return frame
     
-    # Step 4: Adaptive CLAHE with higher clip limit for harsh outdoor lighting
-    # Helps balance bright and dark areas (shadows vs sunlit areas)
-    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))  # Increased from 3.0 to 4.0
-    l_enhanced = clahe.apply(l)
+    # Fast enhancement - CLAHE only (~10-20ms)
+    elif ENHANCEMENT_LEVEL == "fast":
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced_gray = clahe.apply(gray)
+        enhanced_frame = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2BGR)
+        print("   ⚡ Fast enhancement (CLAHE only)")
+        return enhanced_frame
     
-    # Step 5: Apply morphological operations to reduce harsh shadows
-    # Helps smooth out extreme shadow edges common in outdoor settings
-    kernel_morph = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    l_enhanced = cv2.morphologyEx(l_enhanced, cv2.MORPH_CLOSE, kernel_morph)
+    # Balanced enhancement - CLAHE + sharpening (~50-100ms)
+    elif ENHANCEMENT_LEVEL == "balanced":
+        # Convert to LAB for better CLAHE
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        
+        # Apply CLAHE to L channel
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l)
+        
+        # Merge and convert back
+        enhanced_frame = cv2.merge([l_enhanced, a, b])
+        enhanced_frame = cv2.cvtColor(enhanced_frame, cv2.COLOR_LAB2BGR)
+        
+        # Light sharpening
+        kernel = np.array([[-0.5, -0.5, -0.5],
+                           [-0.5,  5.0, -0.5],
+                           [-0.5, -0.5, -0.5]])
+        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+        
+        print("   ⚖️  Balanced enhancement (CLAHE + sharpen)")
+        return enhanced_frame
     
-    # Merge channels back
-    lab_enhanced = cv2.merge([l_enhanced, a, b])
-    enhanced_frame = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+    # Quality enhancement - Full pipeline (~500-700ms)
+    elif ENHANCEMENT_LEVEL == "quality":
+        # Step 1: White balance correction
+        result = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        avg_a = np.average(result[:, :, 1])
+        avg_b = np.average(result[:, :, 2])
+        result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 0.3)
+        result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 0.3)
+        balanced_frame = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+        
+        # Step 2: Bilateral filter (noise reduction)
+        denoised = cv2.bilateralFilter(balanced_frame, 5, 50, 50)
+        
+        # Step 3: CLAHE
+        lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l)
+        
+        # Step 4: Morphological operations
+        kernel_morph = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        l_enhanced = cv2.morphologyEx(l_enhanced, cv2.MORPH_CLOSE, kernel_morph)
+        
+        lab_enhanced = cv2.merge([l_enhanced, a, b])
+        enhanced_frame = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+        
+        # Step 5: Histogram equalization
+        yuv = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2YUV)
+        yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])
+        enhanced_frame = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+        
+        # Step 6: Sharpening
+        kernel = np.array([[-1, -1, -1],
+                           [-1,  9, -1],
+                           [-1, -1, -1]]) / 1.0
+        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+        
+        # Step 7: Gamma correction
+        gray = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2GRAY)
+        mean_brightness = np.mean(gray)
+        
+        if mean_brightness > 150:
+            gamma = 0.8
+        elif mean_brightness < 80:
+            gamma = 1.4
+        else:
+            gamma = 1.1
+        
+        lookUpTable = np.empty((1, 256), np.uint8)
+        for i in range(256):
+            lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+        enhanced_frame = cv2.LUT(enhanced_frame, lookUpTable)
+        
+        # Step 8: Detail enhancement
+        enhanced_frame = cv2.detailEnhance(enhanced_frame, sigma_s=10, sigma_r=0.15)
+        
+        print("   💎 Quality enhancement (full pipeline)")
+        return enhanced_frame
     
-    # Step 6: Adaptive histogram equalization on each color channel
-    # Helps with color cast issues from different sun angles
-    yuv = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2YUV)
-    yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])
-    enhanced_frame = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
-    
-    # Step 7: Enhanced sharpening for better edge detection
-    # Important for faces at distance in bright sunlight
-    kernel = np.array([[-1, -1, -1],
-                       [-1,  9, -1],
-                       [-1, -1, -1]]) / 1.0
-    enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
-    
-    # Step 8: Adaptive gamma correction based on image brightness
-    # Automatically adjusts for different sun positions throughout the day
-    gray = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2GRAY)
-    mean_brightness = np.mean(gray)
-    
-    # Adjust gamma based on overall brightness
-    if mean_brightness > 150:  # Very bright (direct sunlight)
-        gamma = 0.8  # Darken to reduce overexposure
-    elif mean_brightness < 80:  # Too dark (heavy shadows)
-        gamma = 1.4  # Brighten to see details in shadows
-    else:  # Normal lighting
-        gamma = 1.1  # Slight enhancement
-    
-    lookUpTable = np.empty((1, 256), np.uint8)
-    for i in range(256):
-        lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
-    enhanced_frame = cv2.LUT(enhanced_frame, lookUpTable)
-    
-    # Step 9: Final detail enhancement for outdoor scenes
-    # Helps bring out facial features in challenging lighting
-    enhanced_frame = cv2.detailEnhance(enhanced_frame, sigma_s=10, sigma_r=0.15)
-    
-    return enhanced_frame
-
-def process_frame_multiprocess(frame_data):
-    """
-    Process frame for face recognition - designed for multiprocessing
-    Optimized for security cameras with far face detection
-    frame_data should be a tuple: (frame, camera_type, camera_name, known_encodings, known_names, frame_count)
-    """
-    # Performance monitoring - start timing
-    if ENABLE_PERFORMANCE_MONITORING:
-        process_start_time = time.time()
-        detection_start_time = 0
-        recognition_start_time = 0
-        detection_time = 0  # Initialize to avoid undefined variable error
-        recognition_time = 0  # Initialize to avoid undefined variable error
     else:
-        process_start_time = 0
-        detection_start_time = 0
-        recognition_start_time = 0
-        detection_time = 0
-        recognition_time = 0
+        # Default to fast if invalid level
+        print(f"   ⚠️  Invalid ENHANCEMENT_LEVEL: {ENHANCEMENT_LEVEL}, using 'fast'")
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced_gray = clahe.apply(gray)
+        enhanced_frame = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2BGR)
+        return enhanced_frame
+
+def process_frame(frame, camera_type, camera_name):
+    """
+    Process frame for face recognition using SCRFD detector
+    Optimized for security cameras with far face detection
+    """
+    global known_encodings, known_names, frame_count, previous_frames
     
-    # Ensure global variables are accessible (now using ThreadPoolExecutor - shared memory)
-    global MIN_FACE_SIZE, MAX_FACES_PER_FRAME
-
-    frame, camera_type, camera_name, known_encodings, known_names, frame_count = frame_data
-
+    # ⏱️ Start timing - Frame enters processing
+    frame_start_time = time.time()
+    print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
+    print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+    
     results = []
+    frame_count += 1
 
     # Get original frame dimensions
     height, width = frame.shape[:2]
+    
+    # ⏱️ Scene change detection (intelligent frame skipping)
+    if ENABLE_INTELLIGENT_FRAME_SKIPPING and camera_name in previous_frames:
+        scene_change_start = time.time()
+        
+        # Convert both frames to grayscale for comparison
+        gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray_previous = cv2.cvtColor(previous_frames[camera_name], cv2.COLOR_BGR2GRAY)
+        
+        # Calculate absolute difference
+        frame_diff = cv2.absdiff(gray_previous, gray_current)
+        
+        # Apply threshold
+        _, thresh = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
+        
+        # Calculate percentage of changed pixels
+        changed_pixels = np.sum(thresh > 0)
+        total_pixels = thresh.size
+        change_percentage = (changed_pixels / total_pixels) * 100
+        
+        scene_change_time = (time.time() - scene_change_start) * 1000
+        
+        # Skip frame if change is below threshold
+        if change_percentage < SCENE_CHANGE_PIXEL_THRESHOLD:
+            print(f"⏭️  Frame skipped - No significant scene change ({change_percentage:.2f}% < {SCENE_CHANGE_PIXEL_THRESHOLD}%)")
+            print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+            print(f"⏱️  ========== FRAME {frame_count} SKIPPED ==========\n")
+            return results
+        else:
+            print(f"🔄 Scene changed ({change_percentage:.2f}% >= {SCENE_CHANGE_PIXEL_THRESHOLD}%) - Processing frame")
+            print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+    
+    # Store current frame for next comparison
+    previous_frames[camera_name] = frame.copy()
 
-    # Apply image enhancement for better face detection (outdoor optimizations)
+    # ⏱️ Enhancement start
+    enhancement_start = time.time()
+    # Apply image enhancement for better face detection
     enhanced_frame = enhance_image_for_face_detection(frame)
+    enhancement_time = (time.time() - enhancement_start) * 1000
+    print(f"⏱️  Image enhancement: {enhancement_time:.2f}ms")
 
-    # Performance monitoring - detection phase start
-    if ENABLE_PERFORMANCE_MONITORING:
-        detection_start_time = time.time()
-
-    # Use InsightFace RetinaFace for detection (built-in multi-scale)
+    # ⏱️ Detection start
+    detection_start = time.time()
+    # Use InsightFace SCRFD for detection
     face_locations = []
     face_data_list = []
+    face_det_scores = []  # Store detection confidence for each face
+    detection_time = 0  # Initialize to avoid UnboundLocalError
+    
+    # Check if face_app is initialized
+    if face_app is None:
+        detection_time = (time.time() - detection_start) * 1000
+        print(f"❌ Face detection skipped - InsightFace not initialized")
+        print(f"⏱️  Face detection (RetinaFace): {detection_time:.2f}ms")
+        
+        # Skip to end with empty results
+        total_time = (time.time() - frame_start_time) * 1000
+        print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
+        print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(RetinaFace)={detection_time:.0f}ms | Embedding=0ms | Recognition=0ms\n")
+        return results
     
     try:
-        # Detect faces with RetinaFace (returns face objects with bbox, landmarks, embedding)
+        # Detect faces with SCRFD on BOTH original and enhanced frames
+        # Try enhanced frame first (better quality)
         faces = face_app.get(enhanced_frame)
+        
+        # If no faces found on enhanced, try original frame
+        if len(faces) == 0:
+            print("   🔄 No faces on enhanced frame, trying original frame...")
+            faces = face_app.get(frame)
         
         # Extract bounding boxes and embeddings
         for face in faces:
@@ -1336,34 +865,38 @@ def process_frame_multiprocess(frame_data):
             face_width = right - left
             face_height = bottom - top
             
-            # Filter faces that are too small
+            # Get detection confidence score
+            det_score = float(face.det_score) if hasattr(face, 'det_score') else 0.0
+            
+            # Filter faces that are too small (reduced threshold)
             if face_width >= MIN_FACE_SIZE and face_height >= MIN_FACE_SIZE:
                 face_locations.append((top, right, bottom, left))
-                face_data_list.append(face)  # Store face object for embeddings
+                face_data_list.append(face)
+                face_det_scores.append(det_score)
+                print(f"   ✅ Face {len(face_locations)}: size={face_width}x{face_height}px, confidence={det_score:.3f}, location=({left},{top})-({right},{bottom})")
         
+        detection_time = (time.time() - detection_start) * 1000
+        print(f"⏱️  Face detection (RetinaFace): {detection_time:.2f}ms")
         print(f"🎯 RETINAFACE DETECTION RESULTS for {camera_name}:")
         print(f"   - Total faces detected: {len(faces)}")
         print(f"   - After size filtering (>={MIN_FACE_SIZE}px): {len(face_locations)}")
     
     except Exception as e:
+        detection_time = (time.time() - detection_start) * 1000
         print(f"❌ Error during face detection: {e}")
+        import traceback
+        traceback.print_exc()
         faces = []
         face_data_list = []
+        face_locations = []  # Ensure it's initialized
 
-    # Complete detection timing even if no faces found
-    if ENABLE_PERFORMANCE_MONITORING:
-        detection_end_time = time.time()
-        detection_time = detection_end_time - detection_start_time
-        log_performance_metric('detection_time', detection_time)
-        print(f"📊 detection_time: {detection_time * 1000:.2f} ms")
-
-    # Get face embeddings from detected faces (already computed by InsightFace)
+    # ⏱️ Embedding extraction start
+    embedding_start = time.time()
+    # Get face embeddings from detected faces
     face_embeddings = []
+    embedding_time = 0  # Initialize to avoid UnboundLocalError
+    
     if face_locations:
-        # Performance monitoring - recognition phase start
-        if ENABLE_PERFORMANCE_MONITORING:
-            recognition_start_time = time.time()
-        
         # Extract and normalize embeddings from face objects
         for face in face_data_list:
             embedding = np.asarray(face.embedding, dtype=np.float32)
@@ -1373,27 +906,28 @@ def process_frame_multiprocess(frame_data):
                 embedding = embedding / norm
             face_embeddings.append(embedding)
     
+    embedding_time = (time.time() - embedding_start) * 1000
+    if face_locations:
+        print(f"⏱️  Embedding extraction: {embedding_time:.2f}ms")
+    
     # Si aucun encodage n'est disponible, sauvegarder les visages comme inconnus
     if not known_encodings or len(known_encodings) == 0:
-        print(f"⚠️  No encodings available - {len(face_locations)} faces detected will be saved as unknown")
-        if face_locations:  # Sauvegarder seulement toutes les 30 frames
-            unknown_faces = []
-            for face_location in face_locations:
-                # Coordonnées déjà dans l'échelle originale
-                top, right, bottom, left = face_location
-                face_image = frame[top:bottom, left:right]
-                unknown_faces.append({
-                    'type': 'unknown_face',
-                    'face_image': face_image,
-                    'face_location': (top, right, bottom, left),
-                    'camera_name': camera_name
-                })
-            results.extend(unknown_faces)
-            print(f"💾 Saved {len(unknown_faces)} unknown faces from {camera_name}")
+        print(f"⚠️  No encodings available - {len(face_locations)} faces detected will be saved")
+        # Save ALL detected faces
+        for i, face_location in enumerate(face_locations):
+            det_score = face_det_scores[i] if i < len(face_det_scores) else 0.0
+            save_detected_face(frame, face_location, label="unknown", confidence=det_score)
+            save_unknown_face(frame, face_location, confidence=det_score)
+        
+        total_time = (time.time() - frame_start_time) * 1000
+        print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========\n")
         return results
     
     print(f"🔍 Processing {len(face_locations)} faces with {len(known_encodings)} known encodings (Camera: {camera_name})")
     
+    # ⏱️ Recognition start
+    recognition_start = time.time()
+    recognition_time = 0  # Initialize to avoid UnboundLocalError
     current_time = time.time()
     
     # Convert known_encodings to numpy array for efficient computation
@@ -1402,8 +936,10 @@ def process_frame_multiprocess(frame_data):
     for i, (face_embedding, face_location) in enumerate(zip(face_embeddings, face_locations)):
         print(f"  👤 Processing face {i+1}/{len(face_embeddings)} at location {face_location}")
         
+        # Get detection confidence for this face
+        det_score = face_det_scores[i] if i < len(face_det_scores) else 0.0
+        
         # Compute cosine similarity with all known faces
-        # Since embeddings are normalized, dot product = cosine similarity
         similarities = np.dot(known_encodings_array, face_embedding)
         
         # Find best match
@@ -1418,48 +954,31 @@ def process_frame_multiprocess(frame_data):
             
             print(f"     ✅ RECOGNIZED: {name} (confidence: {confidence:.3f})")
             
-            results.append({
-                'type': 'recognition',
-                'name': name,
-                'confidence': confidence,
-                'camera_type': camera_type,
-                'camera_name': camera_name,
-                'timestamp': current_time
-            })
+            # 💾 Save the recognized face
+            save_detected_face(frame, face_location, label=name, confidence=confidence)
+            
+            # ⏱️ Log attendance start
+            log_start = time.time()
+            # Check if we should log this recognition (avoid duplicates)
+            last_time = last_recognition.get(name, 0)
+            if current_time - last_time > 30:  # 30 seconds cooldown
+                log_attendance(name, camera_type, confidence)
+                last_recognition[name] = current_time
+                log_time = (time.time() - log_start) * 1000
+                print(f"⏱️  Attendance logging: {log_time:.2f}ms")
         else:
             print(f"     ❌ No match found - face will be saved as unknown")
-            # Visage inconnu
-            if frame_count % 30 == 0:  # Sauvegarder seulement toutes les 30 frames
-                # Coordonnées déjà dans l'échelle originale
-                top, right, bottom, left = face_location
-                face_image = frame[top:bottom, left:right]
-
-                results.append({
-                    'type': 'unknown_face',
-                    'face_image': face_image,
-                    'face_location': (top, right, bottom, left),
-                    'camera_name': camera_name
-                })
+            # 💾 Save the unknown face with detection confidence
+            save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
+            save_unknown_face(frame, face_location, confidence=det_score)
     
-    # Performance monitoring - recognition phase end and overall timing
-    if ENABLE_PERFORMANCE_MONITORING:
-        if recognition_start_time > 0:  # Only calculate if recognition actually started
-            recognition_end_time = time.time()
-            recognition_time = recognition_end_time - recognition_start_time
-            log_performance_metric('recognition_time', recognition_time)
-        
-        total_process_time = time.time() - process_start_time
-        log_performance_metric('total_process_time', total_process_time)
-        
-        # Update global performance counters - only if variables are properly defined
-        try:
-            global perf_total_detection_time, perf_total_recognition_time, perf_faces_detected, perf_faces_recognized
-            perf_total_detection_time += detection_time
-            perf_total_recognition_time += recognition_time
-            perf_faces_detected += len(face_locations)
-            perf_faces_recognized += len([r for r in results if r['type'] == 'recognition'])
-        except NameError as e:
-            print(f"⚠️ Performance counter error (non-critical): {e}")
+    recognition_time = (time.time() - recognition_start) * 1000
+    print(f"⏱️  Face recognition: {recognition_time:.2f}ms")
+    
+    # ⏱️ Total frame processing time
+    total_time = (time.time() - frame_start_time) * 1000
+    print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
+    print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(RetinaFace)={detection_time:.0f}ms | Embedding={embedding_time:.0f}ms | Recognition={recognition_time:.0f}ms\n")
     
     return results
 
@@ -1468,10 +987,14 @@ def main():
     """Fonction principale"""
     global frame_count
     
-    # Initialize encodings first (only in main process)
+    # Initialize encodings first
     initialize_encodings()
     
-    print("🚀 Démarrage du système de reconnaissance faciale...")
+    print("🚀 Démarrage du système de reconnaissance faciale (Single Camera Mode - RetinaFace)...")
+    print(f"📹 Camera URL: {SINGLE_CAMERA_URL}")
+    print(f"📹 Camera Name: {SINGLE_CAMERA_NAME}")
+    print(f"📹 Camera Type: {SINGLE_CAMERA_TYPE}")
+    print(f"🎯 Using RetinaFace detector for high-accuracy face detection!")
     
     # Établir la connexion WebSocket
     connect_websocket()
@@ -1481,309 +1004,49 @@ def main():
         print("⚠️  Aucun encodage disponible. Le système fonctionnera en mode détection seulement.")
         print("💡 Les visages détectés seront sauvegardés comme inconnus.")
     
-    # Initialiser les caméras avec support parallèle
-    camera_results = initialize_cameras()
+    # Initialize the single camera
+    camera_data = initialize_single_camera()
     
-    # Start camera monitoring thread
-    camera_monitor_thread = threading.Thread(target=camera_monitor, daemon=True)
-    camera_monitor_thread.start()
+    if not camera_data:
+        print("❌ Impossible d'initialiser la caméra. Le programme va s'arrêter.")
+        return
     
     # Start listener thread for quit commands
-    listener_thread = threading.Thread(target=listen_for_quit)
+    listener_thread = threading.Thread(target=listen_for_quit, daemon=True)
     listener_thread.start()
     
-    # Initialize file watcher
-    encodings_observer = initialize_file_watcher()
-    
-    if not camera_results:
-        print("⚠️  Aucune caméra disponible initialement. Le système continuera en mode API seulement.")
-        print("💡 Les caméras seront détectées automatiquement par le moniteur de caméras.")
-        print("💡 Vous pouvez ajouter des étudiants via l'interface web.")
-    else:
-        print(f"🎥 {len(camera_results)} caméra(s) détectée(s) au démarrage")
-    
-    print(f"🎥 Démarrage du système de reconnaissance faciale...")
+    print(f"🎥 Démarrage de la reconnaissance faciale...")
     print("💡 Tapez 'q' ou 'quit' pour arrêter le programme")
     
-    # Initialize multiprocessing pool for face recognition
-    # Use more processes to fully utilize CPU, regardless of camera count
-    num_processes = min(mp.cpu_count(), MAX_CPU_PROCESSES)  # Use up to MAX_CPU_PROCESSES for better CPU utilization
-    print(f"🚀 Utilisation de {num_processes} threads pour la reconnaissance faciale (CPU: {mp.cpu_count()} cores)")
-    print(f"💡 Configuration optimisée: ThreadPoolExecutor pour partager les modèles InsightFace")
+    cap = camera_data['cap']
+    camera_name = camera_data['name']
+    camera_type = camera_data['type']
     
-    # Display performance optimization settings
-    print(f"⚡ OPTIMISATIONS DE PERFORMANCE:")
-    print(f"   - Frame skipping interval: {FRAME_SKIP_INTERVAL}")
-    print(f"   - Intelligent frame skipping: {'ENABLED' if ENABLE_INTELLIGENT_FRAME_SKIPPING else 'DISABLED'}")
-    print(f"   - Scene change detection: {'ENABLED' if ENABLE_SCENE_CHANGE_DETECTION else 'DISABLED'}")
-    if ENABLE_SCENE_CHANGE_DETECTION:
-        print(f"   - Scene change threshold: {SCENE_CHANGE_THRESHOLD}%")
-        print(f"   - Pixel difference threshold: {SCENE_CHANGE_PIXEL_THRESHOLD}")
-        print(f"   - Min contour area: {SCENE_CHANGE_MIN_CONTOUR_AREA}px")
-    print(f"   - Performance monitoring: {'ENABLED' if ENABLE_PERFORMANCE_MONITORING else 'DISABLED'}")
-
-    # Frame skipping configuration for performance optimization
-    # Reduce frame skipping to increase CPU workload
     frame_skip_counter = 0
-    cpu_report_counter = 0
 
     try:
-        # ✅ Use ThreadPoolExecutor instead of ProcessPoolExecutor
-        # InsightFace models are expensive to load - better to share them across threads
-        with ThreadPoolExecutor(max_workers=num_processes) as process_executor:
-            while not shutdown_event.is_set():
-                frame_start_time = time.time() if ENABLE_PERFORMANCE_MONITORING else 0
-
-                with camera_lock:
-                    current_cameras = dict(camera_caps)
-
-                if not current_cameras:
-                    print("⏳ Aucune caméra active - en attente de caméras...")
-                    time.sleep(5)  # Longer sleep when waiting for cameras
-                    continue
-
-                # Increment frame skip counter
-                frame_skip_counter += 1
-                
-                # Check for shutdown signal frequently for responsive stopping
-                if shutdown_event.is_set():
-                    print("🔄 Signal d'arrêt détecté, arrêt du traitement...")
-                    break
-                
-                # Only process frames every Nth iteration for performance
-                should_process_frame = (frame_skip_counter % FRAME_SKIP_INTERVAL == 0)
-                
-                # Prepare data for multiprocessing
-                camera_frame_data = []
-                failed_cameras = []
-                
-                # First, collect frames from all cameras (I/O bound - use threads)
-                io_start_time = time.time() if ENABLE_PERFORMANCE_MONITORING else 0
-                with ThreadPoolExecutor(max_workers=min(len(current_cameras), 10)) as thread_executor:
-                    frame_futures = {}
-                    
-                    for cam_id, cam_data in current_cameras.items():
-                        cap = cam_data.get('cap')
-                        if cap and cap.isOpened():
-                            future = thread_executor.submit(cap.read)
-                            frame_futures[future] = (cam_id, cam_data)
-                    
-                    # Collect frames as they're ready
-                    for future in as_completed(frame_futures):
-                        cam_id, cam_data = frame_futures[future]
-                        try:
-                            ret, frame = future.result()
-                            if ret:
-                                # 🔍 Scene Change Detection
-                                should_process_camera = True
-                                if ENABLE_INTELLIGENT_FRAME_SKIPPING and ENABLE_SCENE_CHANGE_DETECTION and cam_id in previous_frames:
-                                    has_change = detect_scene_change(previous_frames[cam_id], frame)
-                                    should_process_camera = has_change
-                                    if not has_change:
-                                        pass  # Skip processing silently
-                                
-                                # Store current frame as previous for next iteration
-                                previous_frames[cam_id] = frame.copy()
-                                
-                                # Only add to processing queue if scene change detected or first frame or if intelligent skipping is disabled
-                                if should_process_camera or not ENABLE_INTELLIGENT_FRAME_SKIPPING:
-                                    with encodings_lock:
-                                        current_encodings = list(known_encodings)  # Create copy for process
-                                        current_names = list(known_names)  # Create copy for process
-                                    
-                                    camera_frame_data.append((
-                                        frame,
-                                        cam_data.get('type', 'entry'),
-                                        cam_data.get('name', f'Camera-{cam_id}'),
-                                        current_encodings,
-                                        current_names,
-                                        frame_count + 1
-                                    ))
-                                    print(f"📹 Scene change detected in {cam_data.get('name', f'Camera-{cam_id}')} - added to processing queue")
-                            else:
-                                failed_cameras.append(cam_id)
-                        except Exception as e:
-                            print(f"❌ Erreur lecture caméra {cam_id}: {e}")
-                            failed_cameras.append(cam_id)
-                
-                # Performance monitoring - I/O timing
-                if ENABLE_PERFORMANCE_MONITORING and io_start_time > 0:
-                    io_end_time = time.time()
-                    io_time = io_end_time - io_start_time
-                    log_performance_metric('io_time', io_time)
-                    global perf_total_io_time
-                    perf_total_io_time += io_time
-                
-                # Increment frame count
-                frame_count += 1
-                
-                # Log frame processing every 50 frames
-                # if frame_count % 50 == 0:
-                #     processed_cameras = len(camera_frame_data)
-                #     skipped_cameras = len(current_cameras) - processed_cameras if current_cameras else 0
-                #     print(f"📊 FRAME PROCESSING STATUS (Frame {frame_count}):")
-                #     print(f"   - Total cameras: {len(current_cameras) if current_cameras else 0}")
-                #     print(f"   - Cameras with scene changes: {processed_cameras}")
-                #     print(f"   - Cameras skipped (no change): {skipped_cameras}")
-                #     print(f"   - Known encodings: {len(known_encodings) if known_encodings else 0}")
-                #     print(f"   - Should process this frame: {should_process_frame}")
-                #     print(f"   - Scene change detection: {'ENABLED' if ENABLE_SCENE_CHANGE_DETECTION else 'DISABLED'}")
-                # else:
-                #     processed_cameras = len(camera_frame_data)
-                #     total_cameras = len(current_cameras) if current_cameras else 0
-
-                # Periodic CPU usage report
-                # cpu_report_counter += 1
-                # if cpu_report_counter % 30 == 0:  # Every 30 frames
-                #     avg_cpu = psutil.cpu_percent(interval=0.5)
-                #     memory = psutil.virtual_memory()
-                #     print(f"📊 Rapport de performance - CPU: {avg_cpu:.1f}% | Mémoire: {memory.percent:.1f}% | Processus actifs: {len(processing_futures) if 'processing_futures' in locals() else 0}")
-
-                # Process frames using multiprocessing (CPU bound) - only if we should process this frame
-                if camera_frame_data and should_process_frame:
-                    # Monitor CPU usage
-                    cpu_usage = psutil.cpu_percent(interval=0.1)
-                    print(f"🔍 Traitement de {len(camera_frame_data)} frame(s) - CPU: {cpu_usage:.1f}% - Compteur: {frame_skip_counter}")
-
-                    # Submit tasks to process pool with proper mapping
-                    processing_futures = []
-                    future_to_camera_data = {}
-
-                    # Submit original tasks
-                    for frame_data in camera_frame_data:
-                        future = process_executor.submit(process_frame_multiprocess, frame_data)
-                        processing_futures.append(future)
-                        future_to_camera_data[future] = frame_data
-
-                    # If we have fewer tasks than processes, submit additional tasks for better CPU utilization
-                    original_task_count = len(processing_futures)
-                    if len(processing_futures) < num_processes:
-                        # Duplicate some tasks to keep all cores busy
-                        additional_tasks = min(num_processes - len(processing_futures), len(camera_frame_data))
-                        for i in range(additional_tasks):
-                            future = process_executor.submit(process_frame_multiprocess, camera_frame_data[i])
-                            processing_futures.append(future)
-                            future_to_camera_data[future] = camera_frame_data[i]  # Map to original camera data
-                        if additional_tasks > 0:
-                            print(f"📈 Tâches supplémentaires soumises: {additional_tasks} (Original: {original_task_count}, Total: {len(processing_futures)})")
-
-                    # Validate mapping integrity
-                    if len(future_to_camera_data) != len(processing_futures):
-                        print(f"⚠️  Attention: Incohérence mapping ({len(future_to_camera_data)} vs {len(processing_futures)})")
-
-                    # Collect and process results using proper mapping
-                    processed_count = 0
-                    for future in as_completed(processing_futures):
-                        processed_count += 1
-                        try:
-                            results = future.result()
-                            # Get camera data from the mapping
-                            if future not in future_to_camera_data:
-                                print(f"⚠️  Future sans mapping trouvé: {id(future)}")
-                                continue
-
-                            frame_data = future_to_camera_data[future]
-                            # Validate frame_data structure
-                            if len(frame_data) < 3:
-                                print(f"⚠️  Structure frame_data invalide: {len(frame_data)} éléments")
-                                camera_name = f"Camera-{processed_count}"
-                                camera_type = "unknown"
-                            else:
-                                camera_name = frame_data[2]  # Camera name
-                                camera_type = frame_data[1]  # Camera type
-
-                            # Process recognition results
-                            total_recognitions = len([r for r in results if r['type'] == 'recognition'])
-                            total_unknowns = len([r for r in results if r['type'] == 'unknown_face'])
-                            
-                            print(f"📋 Processing results from {camera_name}: {total_recognitions} recognitions, {total_unknowns} unknowns")
-                            
-                            for result in results:
-                                if result['type'] == 'recognition':
-                                    name = result['name']
-                                    confidence = result['confidence']
-                                    current_time = result['timestamp']
-
-                                    # Check for duplicate detection
-                                    if name not in last_recognition or current_time - last_recognition[name] > 30:
-                                        print(f"👤 {name} détecté sur caméra {camera_name} ({camera_type}) (confiance: {confidence:.2f})")
-                                        log_attendance(name, camera_type, confidence)
-                                        last_recognition[name] = current_time
-                                        presence[name] = current_time
-                                    else:
-                                        time_since_last = current_time - last_recognition[name]
-                                        print(f"🔄 {name} détecté récemment ({time_since_last:.1f}s ago) - skipping duplicate")
-
-                                elif result['type'] == 'unknown_face':
-                                    print(f"❓ Unknown face detected on {camera_name} - saving")
-                                    save_unknown_face_from_data(result)
-
-                        except Exception as e:
-                            print(f"❌ Erreur traitement résultat reconnaissance: {e}")
-                            # Print additional debug information
-                            if future in future_to_camera_data:
-                                frame_data = future_to_camera_data[future]
-                                camera_name = frame_data[2] if len(frame_data) > 2 else "Unknown"
-                                print(f"   📍 Contexte: Caméra {camera_name}, Future ID: {id(future)}")
-                            else:
-                                print(f"   📍 Contexte: Future ID: {id(future)} (pas de mapping trouvé)")
-
-                    # Log processing completion
-                    if processed_count > 0:
-                        print(f"✅ Traitement terminé: {processed_count}/{len(processing_futures)} tâches complétées")
-                
-                # Performance monitoring - log frame completion time
-                if ENABLE_PERFORMANCE_MONITORING and frame_start_time > 0:
-                    frame_end_time = time.time()
-                    frame_processing_time = frame_end_time - frame_start_time
-                    log_performance_metric('frame_processing_time', frame_processing_time)
-                    
-                    # Log detailed timing if enabled
-                    if TRACK_DETAILED_TIMING:
-                        print(f"⏱️ Frame {frame_count} traité en {frame_processing_time:.3f}s")
-                    
-                    # Periodic performance report
-                    if frame_count % PERFORMANCE_REPORT_INTERVAL == 0:
-                        report_performance_stats()
-                        reset_performance_stats()
-                
-                # Handle failed cameras - attempt reconnection
-                if failed_cameras:
-                    for cam_id in failed_cameras:
-                        with camera_lock:
-                            if cam_id in camera_caps:
-                                cam_data = camera_caps[cam_id]
-                                cam_name = cam_data.get('name', f'Camera-{cam_id}')
-                                print(f"🔄 Tentative de reconnexion pour {cam_name}...")
-                                
-                                # Close failed camera
-                                if cam_data.get('cap'):
-                                    cam_data['cap'].release()
-                                
-                                # Try to reinitialize this specific camera
-                                if cam_id in camera_configs:
-                                    new_cam_data = initialize_single_camera(camera_configs[cam_id])
-                                    if new_cam_data:
-                                        camera_caps[cam_id] = new_cam_data
-                                        print(f"✅ Caméra {cam_name} reconnectée")
-                                    else:
-                                        del camera_caps[cam_id]
-                                        print(f"❌ Échec reconnexion {cam_name}")
-                
-                # Check for shutdown before sleeping
-                if shutdown_event.is_set():
-                    break
-                
-                # Adaptive sleep based on processing load and CPU usage
-                if should_process_frame:
-                    # Check CPU usage to adjust sleep time
-                    current_cpu = psutil.cpu_percent(interval=0.1)
-                    if current_cpu < 70:  # If CPU usage is low, reduce sleep to process more
-                        time.sleep(0.02)  # Very short sleep to increase throughput
-                    else:
-                        time.sleep(0.05)  # Normal sleep when CPU is busy
-                else:
-                    time.sleep(0.01)  # Very short sleep when skipping frames
+        while not shutdown_event.is_set():
+            # Check for shutdown signal frequently
+            if shutdown_event.is_set():
+                print("🔄 Signal d'arrêt détecté, arrêt du traitement...")
+                break
+            
+            # Read frame from camera
+            ret, frame = cap.read()
+            
+            if not ret:
+                print(f"❌ Erreur lecture caméra {camera_name}")
+                time.sleep(1)
+                continue
+            
+            # Increment frame skip counter
+            frame_skip_counter += 1
+            
+            # Only process frames every Nth iteration
+            if frame_skip_counter % FRAME_SKIP_INTERVAL == 0:
+                process_frame(frame, camera_type, camera_name)
+            
+            time.sleep(0.01)  # Small sleep to reduce CPU usage
             
         print("✅ Boucle principale terminée")
             
@@ -1794,44 +1057,14 @@ def main():
         # Nettoyer les ressources
         shutdown_event.set()
         
-        with camera_lock:
-            for cam_data in camera_caps.values():
-                if cam_data.get('cap'):
-                    cam_data['cap'].release()
-            camera_caps.clear()
+        if cap:
+            cap.release()
         
         cv2.destroyAllWindows()
         if ws:
             ws.close()
         
-        # Join background threads
-        try:
-            if 'listener_thread' in locals():
-                listener_thread.join(timeout=2)
-        except:
-            pass
-        
-        try:
-            if 'encodings_observer' in locals() and encodings_observer:
-                encodings_observer.stop()
-                encodings_observer.join(timeout=2)
-        except:
-            pass
-        
-        try:
-            if 'camera_monitor_thread' in locals():
-                camera_monitor_thread.join(timeout=2)
-        except:
-            pass
         print("🧹 Ressources nettoyées")
 
 if __name__ == "__main__":
-    # Set multiprocessing start method for cross-platform compatibility
-    if hasattr(mp, 'set_start_method'):
-        try:
-            mp.set_start_method('spawn', force=True)
-        except RuntimeError:
-            pass  # Method already set
-    
     main()
-

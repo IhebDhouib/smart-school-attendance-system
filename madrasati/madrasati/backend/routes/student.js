@@ -113,21 +113,25 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
 
     // 🔥 Call Python API for encoding only if photos exist
     if (photoPaths.length > 0) {
-      console.log(`[FACE_API] Starting face encoding for student ${student.matricule}`);
+      console.log(
+        `[FACE_API] Starting face encoding for student ${student.matricule}`
+      );
       console.log(`[FACE_API] Photos to encode: ${photoPaths.length}`);
       console.log(`[FACE_API] FACE_API_URL: ${FACE_API_URL}`);
-      
+
       try {
         for (let i = 0; i < student.photos.length; i++) {
           const photoPath = student.photos[i];
           const absolutePath = path.resolve(photoPath);
-          
-          console.log(`📤 [FACE_API] Sending photo ${i + 1}/${student.photos.length}`);
+
+          console.log(
+            `📤 [FACE_API] Sending photo ${i + 1}/${student.photos.length}`
+          );
           console.log(`   Matricule: ${student.matricule}`);
           console.log(`   Relative path: ${photoPath}`);
           console.log(`   Absolute path: ${absolutePath}`);
           console.log(`   File exists: ${fs.existsSync(absolutePath)}`);
-          
+
           const form = new FormData();
           form.append("matricule", student.matricule);
           form.append("photo", fs.createReadStream(absolutePath));
@@ -135,15 +139,20 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
           const response = await axios.post(
             `${FACE_API_URL}/students/add`,
             form,
-            { 
+            {
               headers: form.getHeaders(),
-              timeout: 30000  // 30 seconds timeout
+              timeout: 30000, // 30 seconds timeout
             }
           );
 
-          console.log(`✅ [FACE_API] Photo ${i + 1} encoded successfully:`, response.data);
+          console.log(
+            `✅ [FACE_API] Photo ${i + 1} encoded successfully:`,
+            response.data
+          );
         }
-        console.log(`✅ [FACE_API] All ${photoPaths.length} photos encoded for student ${student.matricule}`);
+        console.log(
+          `✅ [FACE_API] All ${photoPaths.length} photos encoded for student ${student.matricule}`
+        );
       } catch (err) {
         console.error("❌ [FACE_API] Face API error (add student):", {
           message: err.message,
@@ -151,13 +160,17 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
           status: err.response?.status,
           statusText: err.response?.statusText,
           data: err.response?.data,
-          url: err.config?.url
+          url: err.config?.url,
         });
         // Continue anyway - student is already saved to DB
-        console.warn("⚠️  [FACE_API] Student saved to DB but face encoding failed");
+        console.warn(
+          "⚠️  [FACE_API] Student saved to DB but face encoding failed"
+        );
       }
     } else {
-      console.log(`⚠️  [FACE_API] No photos to encode for student ${student.matricule}`);
+      console.log(
+        `⚠️  [FACE_API] No photos to encode for student ${student.matricule}`
+      );
     }
 
     // Convert photo paths to URLs before returning
@@ -237,17 +250,21 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
 
     // 🔥 If new photos uploaded, re-trigger encoding via API
     if (student.photos && student.photos.length > 0) {
-      console.log(`[FACE_API] Starting face re-encoding for updated student ${student.matricule}`);
+      console.log(
+        `[FACE_API] Starting face re-encoding for updated student ${student.matricule}`
+      );
       console.log(`[FACE_API] Photos to encode: ${student.photos.length}`);
-      
+
       try {
         for (let i = 0; i < student.photos.length; i++) {
           const photoPath = student.photos[i];
           const absolutePath = path.resolve(photoPath);
-          
-          console.log(`📤 [FACE_API] Sending photo ${i + 1}/${student.photos.length}`);
+
+          console.log(
+            `📤 [FACE_API] Sending photo ${i + 1}/${student.photos.length}`
+          );
           console.log(`   File exists: ${fs.existsSync(absolutePath)}`);
-          
+
           const form = new FormData();
           form.append("matricule", student.matricule);
           form.append("photo", fs.createReadStream(absolutePath));
@@ -255,21 +272,26 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
           const response = await axios.post(
             `${FACE_API_URL}/students/add`,
             form,
-            { 
+            {
               headers: form.getHeaders(),
-              timeout: 30000
+              timeout: 30000,
             }
           );
 
-          console.log(`✅ [FACE_API] Photo ${i + 1} update encoded successfully:`, response.data);
+          console.log(
+            `✅ [FACE_API] Photo ${i + 1} update encoded successfully:`,
+            response.data
+          );
         }
-        console.log(`✅ [FACE_API] All ${student.photos.length} photos re-encoded for student ${student.matricule}`);
+        console.log(
+          `✅ [FACE_API] All ${student.photos.length} photos re-encoded for student ${student.matricule}`
+        );
       } catch (err) {
         console.error("❌ [FACE_API] Face API error (update student):", {
           message: err.message,
           code: err.code,
           status: err.response?.status,
-          data: err.response?.data
+          data: err.response?.data,
         });
       }
     }
