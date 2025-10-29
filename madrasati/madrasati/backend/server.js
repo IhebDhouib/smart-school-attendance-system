@@ -83,10 +83,14 @@ app.use("/api/auth", authRoutes);
 
 // MongoDB Connection
 mongoose
-  .connect(process.env.MONGODB_URI || "mongodb://madrasati_user:madrasati123@mongodb:27017/madrasati", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(
+    process.env.MONGODB_URI ||
+      "mongodb://madrasati_user:madrasati123@mongodb:27017/madrasati",
+    {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    }
+  )
   .then(() => logger.info("Connected to MongoDB"))
   .catch((err) =>
     logger.error("MongoDB connection error", {

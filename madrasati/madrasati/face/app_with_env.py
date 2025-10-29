@@ -812,13 +812,16 @@ def process_frame(frame, camera_type, camera_name):
         
         # Skip frame if change is below threshold
         if change_percentage < SCENE_CHANGE_PIXEL_THRESHOLD:
-            print(f"⏭️  Frame skipped - No significant scene change ({change_percentage:.2f}% < {SCENE_CHANGE_PIXEL_THRESHOLD}%)")
-            print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
-            print(f"⏱️  ========== FRAME {frame_count} SKIPPED ==========\n")
+            # 🔇 Logs supprimés pour éviter le spam
+            # print(f"⏭️  Frame skipped - No significant scene change ({change_percentage:.2f}% < {SCENE_CHANGE_PIXEL_THRESHOLD}%)")
+            # print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+            # print(f"⏱️  ========== FRAME {frame_count} SKIPPED ==========\n")
             return results
         else:
-            print(f"🔄 Scene changed ({change_percentage:.2f}% >= {SCENE_CHANGE_PIXEL_THRESHOLD}%) - Processing frame")
-            print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+            # 🔇 Log réduit - seulement si frame est traitée
+            # print(f"🔄 Scene changed ({change_percentage:.2f}% >= {SCENE_CHANGE_PIXEL_THRESHOLD}%) - Processing frame")
+            # print(f"⏱️  Scene change detection: {scene_change_time:.2f}ms")
+            pass
     
     # Store current frame for next comparison
     previous_frames[camera_name] = frame.copy()
