@@ -430,8 +430,14 @@ def connect_websocket():
                                   on_error=on_error,
                                   on_close=on_close)
         
-        # Démarrer la connexion WebSocket dans un thread séparé
-        ws_thread = threading.Thread(target=ws.run_forever, daemon=True)
+        # Démarrer la connexion WebSocket dans un thread séparé avec ping/pong
+        ws_thread = threading.Thread(
+            target=lambda: ws.run_forever(
+                ping_interval=20,  # Send ping every 20 seconds
+                ping_timeout=10    # Wait 10 seconds for pong response
+            ), 
+            daemon=True
+        )
         ws_thread.start()
         
         # Attendre un peu pour la connexion

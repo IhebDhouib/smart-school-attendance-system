@@ -95,11 +95,14 @@ mongoose
     })
   );
 
-// WebSocket Server
+// WebSocket Server with ping/pong heartbeat
 const wss = new WebSocketServer({ port: 3001 });
 
 // Store all connected WebSocket clients
 const connectedClients = new Set();
+
+// Heartbeat interval to keep connections alive
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
 wss.on("connection", (ws, req) => {
   const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
@@ -110,6 +113,12 @@ wss.on("connection", (ws, req) => {
 
   // Add client to the set
   connectedClients.add(ws);
+
+  // Set up heartbeat for this connection
+  ws.isAlive = true;
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
 
   ws.on("message", async (message) => {
     try {
@@ -294,6 +303,25 @@ wss.on("connection", (ws, req) => {
     // Remove client from the set on error
     connectedClients.delete(ws);
   });
+});
+
+// Heartbeat: Send ping to all clients every 30 seconds
+const heartbeatInterval = setInterval(() => {
+  connectedClients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      logger.warn("Client didn't respond to ping, terminating connection");
+      connectedClients.delete(ws);
+      return ws.terminate();
+    }
+
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, HEARTBEAT_INTERVAL);
+
+// Clean up on server shutdown
+wss.on("close", () => {
+  clearInterval(heartbeatInterval);
 });
 
 // Start Express Server
