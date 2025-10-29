@@ -1496,27 +1496,13 @@ def main():
     encodings_observer = initialize_file_watcher()
     
     if not camera_results:
-        print("⚠️  Aucune caméra disponible. Le système continuera en mode API seulement.")
+        print("⚠️  Aucune caméra disponible initialement. Le système continuera en mode API seulement.")
+        print("💡 Les caméras seront détectées automatiquement par le moniteur de caméras.")
         print("💡 Vous pouvez ajouter des étudiants via l'interface web.")
-        
-        # Wait indefinitely to keep the container running for API access
-        try:
-            while not shutdown_event.is_set():
-                time.sleep(10)
-                # Check for new encodings periodically
-                if not known_encodings:
-                    new_encodings, new_names = load_encodings()
-                    if new_encodings:
-                        print("✅ Nouveaux encodages détectés! Tentative de démarrage des caméras...")
-                        camera_results = initialize_cameras()
-                        if camera_results:
-                            break
-        except KeyboardInterrupt:
-            print("\n🛑 Arrêt par Ctrl+C")
-            shutdown_event.set()
-            return
+    else:
+        print(f"🎥 {len(camera_results)} caméra(s) détectée(s) au démarrage")
     
-    print(f"🎥 Démarrage de la reconnaissance faciale avec {len(camera_results)} caméra(s)...")
+    print(f"🎥 Démarrage du système de reconnaissance faciale...")
     print("💡 Tapez 'q' ou 'quit' pour arrêter le programme")
     
     # Initialize multiprocessing pool for face recognition
@@ -1552,7 +1538,8 @@ def main():
                     current_cameras = dict(camera_caps)
 
                 if not current_cameras:
-                    time.sleep(1)
+                    print("⏳ Aucune caméra active - en attente de caméras...")
+                    time.sleep(5)  # Longer sleep when waiting for cameras
                     continue
 
                 # Increment frame skip counter
