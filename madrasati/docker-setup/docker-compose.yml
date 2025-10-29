@@ -72,6 +72,8 @@ services:
       # Backend connection
       BACKEND_URL: http://backend:3000
       WEBSOCKET_URL: ws://backend:3001
+      # Camera configuration - SET THIS FOR YOUR SERVER ENVIRONMENT
+      CAMERA_URL: ${CAMERA_URL:-rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25}
       # InsightFace configuration (RetinaFace + ArcFace)
       INSIGHTFACE_MODEL: buffalo_l
       USE_GPU: "False"

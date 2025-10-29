@@ -23,7 +23,7 @@ db.createCollection("schedules");
 
 // Create indexes for better performance
 db.users.createIndex({ email: 1 }, { unique: true });
-db.students.createIndex({ studentId: 1 }, { unique: true });
+db.students.createIndex({ matricule: 1 }, { unique: true });
 db.teachers.createIndex({ teacherId: 1 }, { unique: true });
 db.attendance.createIndex({ studentId: 1, timestamp: -1 });
 db.schedules.createIndex({ classroomId: 1, date: 1 });
