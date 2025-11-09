@@ -261,9 +261,9 @@ async def add_student(request: Request):
             print("⚠️ No photo received in request form")
             return {"status": "error", "message": "No photo uploaded. Ensure form field name is 'photo' or 'file' or provide base64 in 'photoBase64'"}
 
-        # Run encoding with ArcFace (will process dataset directory)
-        print("🧠 Starting face encoding with ArcFace...")
-        success = encode_faces_from_dataset(model='arcface')
+        # Encode only this specific student (not entire dataset)
+        print(f"🧠 Starting face encoding for {matricule} with ArcFace...")
+        success = encode_single_student(matricule, model='arcface')
 
         if success:
             print(f"✅ Successfully encoded {matricule} with ArcFace")
@@ -435,6 +435,97 @@ async def delete_student(matricule: str):
 async def delete_student_single_model(matricule: str, model: str):
     """Delete student and re-encode with ArcFace"""
     return await delete_student(matricule)
+
+
+def encode_single_student(matricule, model='arcface'):
+    """Encode faces for a single student (not entire dataset) to avoid duplicates"""
+    if model not in FACE_MODELS:
+        print(f"❌ Invalid model: {model}. Use: {list(FACE_MODELS.keys())}")
+        return False
+    
+    print(f"🔄 Encoding single student: {matricule} with {FACE_MODELS[model]['name']}...")
+    
+    # Load existing encodings
+    known_encodings, known_names, _ = load_existing_encodings(model)
+    
+    # Remove existing encodings for this student (avoid duplicates)
+    if matricule in known_names:
+        print(f"🔄 Removing {known_names.count(matricule)} existing encoding(s) for {matricule}")
+        indices_to_keep = [i for i, name in enumerate(known_names) if name != matricule]
+        known_encodings = [known_encodings[i] for i in indices_to_keep]
+        known_names = [known_names[i] for i in indices_to_keep]
+    
+    # Encode new photos for this student
+    person_dir = os.path.join(DATASET_DIR, matricule)
+    if not os.path.isdir(person_dir):
+        print(f"❌ Student directory not found: {person_dir}")
+        return False
+    
+    student_faces = 0
+    for image_name in os.listdir(person_dir):
+        if not image_name.lower().endswith(SUPPORTED_EXTENSIONS):
+            continue
+            
+        image_path = os.path.join(person_dir, image_name)
+        try:
+            # Load image with OpenCV
+            image = cv2.imread(image_path)
+            if image is None:
+                print(f"⚠️  Failed to load {image_name}")
+                continue
+            
+            # Detect faces with RetinaFace and get ArcFace embeddings
+            faces = face_app.get(image)
+            
+            if not faces or len(faces) == 0:
+                print(f"⚠️  No faces found in {image_name}")
+                continue
+            
+            # Process each detected face
+            for face in faces:
+                # Get embedding and normalize it
+                embedding = np.asarray(face.embedding, dtype=np.float32)
+                norm = np.linalg.norm(embedding)
+                if norm > 0:
+                    embedding = embedding / norm
+                
+                known_encodings.append(embedding)
+                known_names.append(matricule)
+                student_faces += 1
+                
+            print(f"   ✅ {image_name}: {len(faces)} face(s) encoded")
+            
+        except Exception as e:
+            print(f"   ❌ Error processing {image_name}: {e}")
+    
+    if student_faces == 0:
+        print(f"❌ No faces encoded for {matricule}")
+        return False
+    
+    print(f"   📊 {matricule}: {student_faces} total faces encoded")
+    
+    # Save updated encodings
+    encodings_file = FACE_MODELS[model]['file']
+    data = {
+        'embeddings': known_encodings,
+        'names': known_names,
+        'model': model,
+        'model_name': FACE_MODELS[model]['name'],
+        'created_at': time.strftime("%Y-%m-%d %H:%M:%S"),
+        'total_faces': len(known_encodings),
+        'unique_students': len(set(known_names)),
+        'embedding_dimension': len(known_encodings[0]) if known_encodings else 0
+    }
+    
+    encodings_dir = os.path.dirname(encodings_file)
+    if encodings_dir:
+        os.makedirs(encodings_dir, exist_ok=True)
+    
+    with open(encodings_file, 'wb') as f:
+        pickle.dump(data, f)
+        
+    print(f"✅ Encodings updated with {matricule} (Total: {len(known_encodings)} faces, {len(set(known_names))} students)")
+    return True
 
 
 def encode_faces_from_dataset(model='arcface'):

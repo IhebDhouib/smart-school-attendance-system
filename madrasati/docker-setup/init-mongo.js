@@ -8,9 +8,9 @@ db.createUser({
   roles: [
     {
       role: "readWrite",
-      db: "madrasati"
-    }
-  ]
+      db: "madrasati",
+    },
+  ],
 });
 
 // Create collections

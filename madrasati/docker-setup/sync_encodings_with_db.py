@@ -15,14 +15,22 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 ENCODINGS_FILE = os.getenv("ENCODINGS_FILE_ARCFACE", "/app/face/encodings_arcface.pkl")
 
 def fetch_active_students():
-    """Fetch all active students from the database"""
+    """Fetch all active students from the database (only those with photos)"""
     try:
         response = requests.get(f"{BACKEND_URL}/api/students", timeout=10)
         if response.status_code == 200:
             students = response.json()
-            # Extract matricule (student IDs) from the response
-            active_matricules = [str(student.get('matricule')) for student in students if student.get('matricule')]
-            print(f"✅ Found {len(active_matricules)} active students in database")
+            # Extract matricule only for students who have photos
+            active_matricules = [
+                str(student.get('matricule')) 
+                for student in students 
+                if student.get('matricule') and student.get('photos') and len(student.get('photos', [])) > 0
+            ]
+            total_students = len(students)
+            students_with_photos = len(active_matricules)
+            print(f"✅ Found {total_students} students in database")
+            print(f"   📸 {students_with_photos} students have photos")
+            print(f"   ⚪ {total_students - students_with_photos} students without photos (will be ignored)")
             return set(active_matricules)  # Use set for faster lookup
         else:
             print(f"❌ Error fetching students: {response.status_code}")
@@ -88,14 +96,16 @@ def sync_encodings_with_database():
     final_unique = len(set(synced_names))
     removed_count = len(removed_students)
     
-    print(f"📊 Synchronization Results:")
+    print(f"\n📊 Synchronization Results:")
     print(f"   Original encodings: {original_count} ({original_unique} unique students)")
-    print(f"   Active students in DB: {len(active_students)}")
+    print(f"   Active students with photos in DB: {len(active_students)}")
     print(f"   Synced encodings: {final_count} ({final_unique} unique students)")
     print(f"   Removed encodings: {original_count - final_count}")
     
     if removed_students:
-        print(f"🗑️  Removed students: {', '.join(sorted(removed_students))}")
+        print(f"\n🗑️  Removed students (deleted or without photos):")
+        for student_id in sorted(removed_students):
+            print(f"      - {student_id}")
     
     # Save the synchronized encodings
     if final_count < original_count:
