@@ -10,30 +10,30 @@ WORKDIR /app
 
 # Install system dependencies
 RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
- && echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries \
- && apt-get -o Acquire::ForceIPv4=true update \
- && apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
-     # Basic utilities
-     apt-transport-https \
-     ca-certificates \
-     curl \
-     # Build tools
-     build-essential \
-     cmake \
-     git \
-     wget \
-     # OpenCV dependencies
-     libopencv-dev \
-     python3-opencv \
-     libglib2.0-0 \
-     libsm6 \
-     libxext6 \
-     libxrender-dev \
-     libgomp1 \
-     libgl1 \
-     # Additional libraries for InsightFace
-     libxcb1 \
- && rm -rf /var/lib/apt/lists/*
+    && echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries \
+    && apt-get -o Acquire::ForceIPv4=true update \
+    && apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
+    # Basic utilities
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    # Build tools
+    build-essential \
+    cmake \
+    git \
+    wget \
+    # OpenCV dependencies
+    libopencv-dev \
+    python3-opencv \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgl1 \
+    # Additional libraries for InsightFace
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the entire project structure
 COPY madrasati/ /app/madrasati/
@@ -57,7 +57,7 @@ RUN mkdir -p \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app:/app/madrasati:/app/madrasati/face \
     # InsightFace settings
-    INSIGHTFACE_MODEL=buffalo_l \
+    INSIGHTFACE_MODEL=buffalo_m \
     USE_GPU=False \
     DET_SIZE=640 \
     DET_THRESH=0.5 \
