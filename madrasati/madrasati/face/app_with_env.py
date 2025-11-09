@@ -1,5 +1,5 @@
 """
-Single Camera Face Recognition System with RetinaFace Detector
+Single Camera Face Recognition System with SCRFD 2.5G Detector
 
 PERFORMANCE OPTIMIZATION:
 - Set ENHANCEMENT_LEVEL to control speed vs quality trade-off:
@@ -20,8 +20,8 @@ USAGE:
 
 EXPECTED TIMING (per frame):
   Enhancement: 10-20ms (fast) | 50-100ms (balanced) | 500-700ms (quality)
-  Detection:   100-200ms (RetinaFace is accurate!)
-  Total:       ~110-220ms per frame with "fast" level = 4-9 FPS
+  Detection:   50-100ms (SCRFD 2.5G is fast and accurate!)
+  Total:       ~60-120ms per frame with "fast" level = 8-16 FPS
 """
 
 import cv2
@@ -85,8 +85,8 @@ LOG_FILE = os.path.join(os.getenv("LOG_DIR", "logs"), "logs.csv")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:3001")
 
-# 🔍 InsightFace Configuration (RetinaFace + ArcFace) - Use environment variables
-INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' uses RetinaFace detector (more accurate)
+# 🔍 InsightFace Configuration (SCRFD 2.5G + ArcFace) - Use environment variables
+INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_m")  # 'buffalo_m' uses SCRFD_2.5G detector (faster, balanced accuracy)
 USE_GPU = os.getenv("USE_GPU", "False").lower() == "true"  # Set to True if CUDA is available for GPU acceleration
 DET_SIZE_VALUE = int(os.getenv("DET_SIZE", "640"))
 DET_SIZE = (DET_SIZE_VALUE, DET_SIZE_VALUE)  # Detection input size - larger = better for small faces
@@ -275,12 +275,12 @@ def initialize_esrgan():
         return False
 
 def initialize_insightface():
-    """Initialize InsightFace FaceAnalysis model with RetinaFace detector"""
+    """Initialize InsightFace FaceAnalysis model with SCRFD 2.5G detector"""
     global face_app
     try:
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
         
-        # buffalo_l uses RetinaFace (more accurate) instead of SCRFD
+        # buffalo_sc uses SCRFD_2.5G detector (faster and balanced)
         face_app = FaceAnalysis(
             name=INSIGHTFACE_MODEL,
             providers=providers
@@ -293,13 +293,13 @@ def initialize_insightface():
         )
         
         print(f"✅ InsightFace initialized successfully!")
-        print(f"   Model: {INSIGHTFACE_MODEL} (RetinaFace detector)")
+        print(f"   Model: {INSIGHTFACE_MODEL} (SCRFD 2.5G detector)")
         print(f"   Providers: {providers}")
         print(f"   Detection size: {DET_SIZE}")
         print(f"   Detection threshold: {DET_THRESH} (lower = more sensitive)")
         print(f"   Recognition threshold: {REC_THRESH}")
         print(f"   Min face size: {MIN_FACE_SIZE}px")
-        print(f"   🎯 RetinaFace provides high accuracy detection!")
+        print(f"   🎯 SCRFD 2.5G provides fast and accurate detection!")
         return True
     except Exception as e:
         print(f"❌ Failed to initialize InsightFace: {e}")
@@ -593,34 +593,42 @@ def log_attendance(student_id, camera_type, confidence):
     else:
         print("❌ Échec envoi WebSocket")
 
-def save_unknown_face(frame, face_location, confidence=0.0):
+def draw_arrow_above_face(frame, face_location):
     """
-    Sauvegarde TOUS les visages inconnus sans filtres de qualité
-    Modifié pour sauvegarder tous les visages détectés
+    Draw a small arrow above an unknown face
     """
     top, right, bottom, left = face_location
     face_width = right - left
-    face_height = bottom - top
     
-    # Extract face image
-    face_image = frame[top:bottom, left:right]
+    # Calculate arrow position (centered above the face)
+    arrow_tip_x = left + face_width // 2
+    arrow_tip_y = top - 10  # 10 pixels above the face
     
-    # Calculate sharpness for filename (informational only)
-    try:
-        gray_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
-        laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
-    except:
-        laplacian_var = 0
+    # Arrow dimensions
+    arrow_length = 30
+    arrow_head_size = 10
     
-    # Generate filename with metadata
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
-    filename = f"{unknown_id}_{timestamp}_size{face_width}x{face_height}_sharp{laplacian_var:.0f}.jpg"
-    filepath = os.path.join(UNKNOWN_DIR, filename)
+    # Draw arrow shaft (vertical line)
+    cv2.line(frame, 
+             (arrow_tip_x, arrow_tip_y), 
+             (arrow_tip_x, arrow_tip_y - arrow_length), 
+             (0, 0, 255),  # Red color
+             2)
     
-    # Save the face without any filters
-    cv2.imwrite(filepath, face_image)
-    print(f"💾 Unknown face saved: {filename} (ALL faces saved - no quality filters)")
+    # Draw arrow head (two lines forming a V)
+    cv2.line(frame,
+             (arrow_tip_x, arrow_tip_y),
+             (arrow_tip_x - arrow_head_size, arrow_tip_y - arrow_head_size),
+             (0, 0, 255),  # Red color
+             2)
+    cv2.line(frame,
+             (arrow_tip_x, arrow_tip_y),
+             (arrow_tip_x + arrow_head_size, arrow_tip_y - arrow_head_size),
+             (0, 0, 255),  # Red color
+             2)
+    
+    
+    return frame
 
 
 def save_detected_face(frame, face_location, label="detected", confidence=0.0):
@@ -887,12 +895,12 @@ def process_frame(frame, camera_type, camera_name):
     if face_app is None:
         detection_time = (time.time() - detection_start) * 1000
         print(f"❌ Face detection skipped - InsightFace not initialized")
-        print(f"⏱️  Face detection (RetinaFace): {detection_time:.2f}ms")
+        print(f"⏱️  Face detection (SCRFD 2.5G): {detection_time:.2f}ms")
         
         # Skip to end with empty results
         total_time = (time.time() - frame_start_time) * 1000
         print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
-        print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(RetinaFace)={detection_time:.0f}ms | Embedding=0ms | Recognition=0ms\n")
+        print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(SCRFD)={detection_time:.0f}ms | Embedding=0ms | Recognition=0ms\n")
         return results
     
     try:
@@ -927,8 +935,8 @@ def process_frame(frame, camera_type, camera_name):
                 print(f"   ✅ Face {len(face_locations)}: size={face_width}x{face_height}px, confidence={det_score:.3f}, location=({left},{top})-({right},{bottom})")
         
         detection_time = (time.time() - detection_start) * 1000
-        print(f"⏱️  Face detection (RetinaFace): {detection_time:.2f}ms")
-        print(f"🎯 RETINAFACE DETECTION RESULTS for {camera_name}:")
+        print(f"⏱️  Face detection (SCRFD 2.5G): {detection_time:.2f}ms")
+        print(f"🎯 SCRFD 2.5G DETECTION RESULTS for {camera_name}:")
         print(f"   - Total faces detected: {len(faces)}")
         print(f"   - After size filtering (>={MIN_FACE_SIZE}px): {len(face_locations)}")
     
@@ -984,6 +992,10 @@ def process_frame(frame, camera_type, camera_name):
     # Convert known_encodings to numpy array for efficient computation
     known_encodings_array = np.array(known_encodings)
     
+    # Track unknown faces to draw arrows later
+    unknown_face_locations = []
+    frame_with_arrows = frame.copy()  # Create a copy to draw on
+    
     for i, (face_embedding, face_location) in enumerate(zip(face_embeddings, face_locations)):
         print(f"  👤 Processing face {i+1}/{len(face_embeddings)} at location {face_location}")
         
@@ -1018,10 +1030,26 @@ def process_frame(frame, camera_type, camera_name):
                 log_time = (time.time() - log_start) * 1000
                 print(f"⏱️  Attendance logging: {log_time:.2f}ms")
         else:
-            print(f"     ❌ No match found - face will be saved as unknown")
-            # 💾 Save the unknown face with detection confidence
+            print(f"     ❌ No match found - will draw arrow above face")
+            # Add to unknown faces list
+            unknown_face_locations.append(face_location)
+            # 💾 Save individual detected face for reference
             save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
-            save_unknown_face(frame, face_location, confidence=det_score)
+    
+    # If there are unknown faces, draw arrows and save the frame
+    if unknown_face_locations:
+        print(f"🔴 Found {len(unknown_face_locations)} unknown face(s) - drawing arrows and saving frame")
+        
+        # Draw arrows above all unknown faces
+        for face_location in unknown_face_locations:
+            frame_with_arrows = draw_arrow_above_face(frame_with_arrows, face_location)
+        
+        # Save the frame with arrows
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"unknown_frame_{timestamp}_{len(unknown_face_locations)}faces.jpg"
+        filepath = os.path.join(UNKNOWN_DIR, filename)
+        cv2.imwrite(filepath, frame_with_arrows)
+        print(f"💾 Frame with {len(unknown_face_locations)} unknown face(s) saved: {filename}")
     
     recognition_time = (time.time() - recognition_start) * 1000
     print(f"⏱️  Face recognition: {recognition_time:.2f}ms")
@@ -1029,7 +1057,7 @@ def process_frame(frame, camera_type, camera_name):
     # ⏱️ Total frame processing time
     total_time = (time.time() - frame_start_time) * 1000
     print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
-    print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(RetinaFace)={detection_time:.0f}ms | Embedding={embedding_time:.0f}ms | Recognition={recognition_time:.0f}ms\n")
+    print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(SCRFD)={detection_time:.0f}ms | Embedding={embedding_time:.0f}ms | Recognition={recognition_time:.0f}ms\n")
     
     return results
 
@@ -1041,11 +1069,11 @@ def main():
     # Initialize encodings first
     initialize_encodings()
     
-    print("🚀 Démarrage du système de reconnaissance faciale (Single Camera Mode - RetinaFace)...")
+    print("🚀 Démarrage du système de reconnaissance faciale (Single Camera Mode - SCRFD 2.5G)...")
     print(f"📹 Camera URL: {SINGLE_CAMERA_URL}")
     print(f"📹 Camera Name: {SINGLE_CAMERA_NAME}")
     print(f"📹 Camera Type: {SINGLE_CAMERA_TYPE}")
-    print(f"🎯 Using RetinaFace detector for high-accuracy face detection!")
+    print(f"🎯 Using SCRFD 2.5G detector for fast and accurate face detection!")
     
     # Établir la connexion WebSocket
     connect_websocket()
