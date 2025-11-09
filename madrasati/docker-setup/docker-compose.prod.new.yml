@@ -1,0 +1,117 @@
+# =============================================================================
+# MADRASATI - Production Environment Configuration
+# =============================================================================
+# This file contains PRODUCTION-ONLY overrides.
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  mongodb:
+    # Production resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    # Production logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  backend:
+    environment:
+      NODE_ENV: production
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
+    # ❌ NO source code bind mounts in production!
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+
+  face-fused:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 180s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
+    # ❌ NO source code bind mounts in production!
+    volumes:
+      - face_encodings:/app/madrasati/face/encodings
+      - face_unknown:/app/madrasati/face/unknown_faces
+      - face_logs:/app/madrasati/face/logs
+      - face_dataset:/app/madrasati/face/dataset
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"
+
+  # Disable mongo-express in production (security risk!)
+  mongo-express:
+    profiles: ["debug"]  # Only start with --profile debug
+
+# Production volumes should be backed up regularly
+volumes:
+  mongodb_data:
+    external: true
+    name: madrasati_mongodb_data
+  face_encodings:
+    external: true
+    name: madrasati_face_encodings
+  backend_uploads:
+    external: true
+    name: madrasati_backend_uploads

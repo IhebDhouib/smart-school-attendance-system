@@ -54,8 +54,7 @@ const cameraSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster queries
-cameraSchema.index({ ip: 1 });
+// Index for faster queries (ip already has unique index from schema)
 cameraSchema.index({ classroom: 1 });
 cameraSchema.index({ status: 1 });
 cameraSchema.index({ type: 1 });

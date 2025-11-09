@@ -1,0 +1,208 @@
+# =============================================================================
+# MADRASATI - Base Docker Compose Configuration
+# =============================================================================
+# This is the BASE configuration shared across all environments.
+# DO NOT put environment-specific settings here!
+#
+# Usage:
+#   Development: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   Production:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+#   Local:       docker-compose -f docker-compose.yml -f docker-compose.local.yml up
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # MongoDB Database
+  # ===========================================================================
+  mongodb:
+    image: mongo:6.0
+    container_name: madrasati_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-madrasati}
+    volumes:
+      # ✅ NAMED VOLUME - Data persists even when code changes!
+      - mongodb_data:/data/db
+      # Init script (read-only)
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    networks:
+      - madrasati_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # MongoDB Web Interface (Development/Monitoring)
+  # ===========================================================================
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: madrasati_mongo_express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${ME_CONFIG_MONGODB_ADMINUSERNAME:-admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${ME_CONFIG_MONGODB_ADMINUSERNAME:-admin}:${MONGO_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_CONFIG_BASICAUTH_USERNAME:-}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_CONFIG_BASICAUTH_PASSWORD:-}
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - madrasati_network
+
+  # ===========================================================================
+  # Node.js Backend API
+  # ===========================================================================
+  backend:
+    build:
+      context: ../madrasati
+      dockerfile: ../docker-setup/Dockerfile.backend
+    container_name: madrasati_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      WEBSOCKET_PORT: ${WEBSOCKET_PORT:-3001}
+      MONGODB_URI: ${MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      FACE_API_URL: http://face-fused:${FACE_API_PORT:-8000}
+    volumes:
+      # ✅ NAMED VOLUMES - Persist data across deployments
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    ports:
+      - "${BACKEND_HTTP_PORT:-3000}:3000"
+      - "${BACKEND_WS_PORT:-3001}:3001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - madrasati_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================================================
+  # Face Recognition Service (Unified)
+  # ===========================================================================
+  face-fused:
+    build:
+      context: ../
+      dockerfile: docker-setup/Dockerfile.face-fused
+    container_name: madrasati_face_fused
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      # Backend connection
+      BACKEND_URL: ${BACKEND_URL:-http://backend:3000}
+      WEBSOCKET_URL: ${WEBSOCKET_URL:-ws://backend:3001}
+      # Camera configuration
+      CAMERA_URL: ${CAMERA_URL}
+      CAMERA_DEVICE: ${CAMERA_DEVICE:-/dev/video0}
+      # InsightFace configuration
+      INSIGHTFACE_MODEL: ${INSIGHTFACE_MODEL:-buffalo_m}
+      USE_GPU: ${USE_GPU:-False}
+      DET_SIZE: ${DET_SIZE:-640}
+      DET_THRESH: ${DET_THRESH:-0.5}
+      REC_THRESH: ${REC_THRESH:-0.45}
+      # Paths (container internal)
+      DATASET_DIR: ${DATASET_DIR:-/app/madrasati/face/dataset}
+      ENCODINGS_FILE_ARCFACE: ${ENCODINGS_FILE_ARCFACE:-/app/madrasati/face/encodings_arcface.pkl}
+      UNKNOWN_FACES_DIR: ${UNKNOWN_FACES_DIR:-/app/madrasati/face/unknown_faces}
+      LOG_DIR: ${LOG_DIR:-/app/madrasati/face/logs}
+    volumes:
+      # ✅ NAMED VOLUMES for persistent data
+      - face_encodings:/app/madrasati/face/encodings
+      - face_unknown:/app/madrasati/face/unknown_faces
+      - face_logs:/app/madrasati/face/logs
+      - face_dataset:/app/madrasati/face/dataset
+    ports:
+      - "${FACE_API_PORT:-8000}:8000"  # Face Encoding API
+      - "${UNKNOWN_FACES_PORT:-5001}:5001"  # Unknown Faces API
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - madrasati_network
+    # Camera access (only if using local USB camera)
+    privileged: true
+    devices:
+      - ${CAMERA_DEVICE:-/dev/video0}:${CAMERA_DEVICE:-/dev/video0}
+
+  # ===========================================================================
+  # Angular Frontend
+  # ===========================================================================
+  frontend:
+    build:
+      context: ../../
+      dockerfile: madrasati/docker-setup/Dockerfile.frontend
+    container_name: madrasati_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - madrasati_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# NAMED VOLUMES - Data persists across git pulls and container rebuilds!
+# =============================================================================
+volumes:
+  # Database - CRITICAL: Never deleted unless explicitly removed
+  mongodb_data:
+    driver: local
+    name: madrasati_mongodb_data
+  
+  # Face recognition data
+  face_encodings:
+    driver: local
+    name: madrasati_face_encodings
+  
+  face_unknown:
+    driver: local
+    name: madrasati_face_unknown
+  
+  face_logs:
+    driver: local
+    name: madrasati_face_logs
+  
+  face_dataset:
+    driver: local
+    name: madrasati_face_dataset
+  
+  # Backend data
+  backend_uploads:
+    driver: local
+    name: madrasati_backend_uploads
+  
+  backend_logs:
+    driver: local
+    name: madrasati_backend_logs
+
+# =============================================================================
+# NETWORK
+# =============================================================================
+networks:
+  madrasati_network:
+    driver: bridge
+    name: madrasati_network

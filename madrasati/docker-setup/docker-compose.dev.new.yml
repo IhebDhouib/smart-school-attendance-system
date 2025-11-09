@@ -1,0 +1,64 @@
+# =============================================================================
+# MADRASATI - Development Environment Configuration
+# =============================================================================
+# This file contains DEVELOPMENT-ONLY overrides.
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+version: '3.8'
+
+services:
+  backend:
+    # Development environment
+    environment:
+      NODE_ENV: development
+      DEBUG: "madrasati:*"
+    volumes:
+      # 🔥 HOT RELOAD: Bind mount source code for live editing
+      - ../madrasati/backend:/app:cached
+      # But exclude node_modules to avoid conflicts
+      - /app/node_modules
+    # No resource limits in dev
+    # Verbose logging
+    command: npm run dev
+
+  face-fused:
+    environment:
+      # More verbose logging in dev
+      LOG_LEVEL: DEBUG
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # 🔥 HOT RELOAD: Bind mount Python code for live editing
+      - ../madrasati/face:/app/madrasati/face:cached
+      # Mount docker-setup scripts
+      - ./unknown_faces_api_fastapi.py:/app/docker-setup/unknown_faces_api_fastapi.py:cached
+      # Keep named volumes for data
+      - face_encodings:/app/madrasati/face/encodings
+      - face_unknown:/app/madrasati/face/unknown_faces
+      - face_logs:/app/madrasati/face/logs
+      - face_dataset:/app/madrasati/face/dataset
+    # Auto-restart on code changes (if using watchdog or similar)
+    command: python -u /app/madrasati/face/app_with_env.py
+
+  frontend:
+    # Development build with source maps
+    build:
+      context: ../../
+      dockerfile: madrasati/docker-setup/Dockerfile.frontend
+      args:
+        BUILD_ENV: development
+    volumes:
+      # 🔥 HOT RELOAD: Mount source for Angular live reload
+      - ../../madrasati/madrasati/madrassati:/app:cached
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "4200:4200"  # Angular dev server
+    command: npm start
+
+  # MongoDB Express is useful in dev, keep it running
+  mongo-express:
+    profiles: ["dev", "debug"]  # Only start with --profile dev
+
+# Development: No resource limits, full logging

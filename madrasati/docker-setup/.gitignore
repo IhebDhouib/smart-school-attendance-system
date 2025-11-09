@@ -1,0 +1,31 @@
+# Local environment
+.env
+.env.local
+
+# Database data
+data/
+mongodb/
+
+# Docker override
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Face recognition generated data
+unknown_faces/
+encodings/
+dataset/
+*.pkl
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backups
+backups/*.sql
+backups/*.gz
+backups/*.dump
+
+# Local scripts
+*.local.*

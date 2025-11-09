@@ -1,0 +1,116 @@
+# =============================================================================
+# Nginx Configuration Template for Madrasati
+# =============================================================================
+# This is a TEMPLATE file. Copy to nginx.conf for customization.
+# 
+# Usage:
+#   cp config/nginx/nginx.conf.template config/nginx/nginx.conf
+#   # Edit nginx.conf with your custom settings
+#   # nginx.conf is NOT tracked in Git (.gitignore)
+# =============================================================================
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    client_max_body_size 50M;  # Allow larger uploads (images, etc.)
+
+    # Compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+
+    # Support websocket upgrade variable
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+
+    server {
+        listen 80;
+        server_name localhost;  # ⚠️ CHANGE THIS IN PRODUCTION to your domain
+        root /usr/share/nginx/html;
+        index index.html;
+
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log warn;
+
+        # Handle Angular routing
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Unknown faces API - MUST be before /api/ to avoid conflicts
+        location /api/unknown-faces {
+            proxy_pass http://face-fused:5001/api/unknown-faces;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 90s;
+            proxy_buffering off;
+            proxy_redirect off;
+        }
+
+        # API proxy to backend
+        location /api/ {
+            proxy_pass http://backend:3000/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $server_name;
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 90s;
+            proxy_buffers 16 4k;
+            proxy_buffer_size 2k;
+            proxy_redirect off;
+        }
+
+        # Face detection API proxy
+        location ^~ /unknown-faces-api/ {
+            proxy_pass http://face-fused:5001/api/unknown-faces/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 90s;
+            proxy_redirect off;
+        }
+
+        # WebSocket proxy
+        location /ws {
+            proxy_pass http://backend:3001;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $host;
+            proxy_read_timeout 86400;
+            proxy_send_timeout 86400;
+            proxy_buffering off;
+        }
+
+        # Static assets caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            try_files $uri =404;
+        }
+    }
+}
