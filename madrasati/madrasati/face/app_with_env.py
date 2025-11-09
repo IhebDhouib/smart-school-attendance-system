@@ -595,60 +595,33 @@ def log_attendance(student_id, camera_type, confidence):
 
 def save_unknown_face(frame, face_location, confidence=0.0):
     """
-    Sauvegarde un visage inconnu avec filtres de qualité
-    Ne sauvegarde que les visages de bonne qualité (pas trop petits, pas flous, bonne confiance)
+    Sauvegarde TOUS les visages inconnus sans filtres de qualité
+    Modifié pour sauvegarder tous les visages détectés
     """
     top, right, bottom, left = face_location
     face_width = right - left
     face_height = bottom - top
     
-    # 🔍 QUALITY FILTERS - Only save high-quality unknown faces
-    
-    # Filter 1: Minimum size (avoid tiny/far faces)
-    MIN_UNKNOWN_FACE_SIZE = 80  # pixels (much larger than MIN_FACE_SIZE)
-    if face_width < MIN_UNKNOWN_FACE_SIZE or face_height < MIN_UNKNOWN_FACE_SIZE:
-        print(f"   ⏭️  Unknown face NOT saved - too small ({face_width}x{face_height}px < {MIN_UNKNOWN_FACE_SIZE}px)")
-        return
-    
-    # Filter 2: Aspect ratio (avoid weird crops)
-    aspect_ratio = face_width / face_height
-    if aspect_ratio < 0.7 or aspect_ratio > 1.5:
-        print(f"   ⏭️  Unknown face NOT saved - bad aspect ratio ({aspect_ratio:.2f})")
-        return
-    
-    # Filter 3: Minimum confidence (detection confidence should be decent)
-    MIN_UNKNOWN_CONFIDENCE = 0.5  # Only save faces detected with >50% confidence
-    if confidence < MIN_UNKNOWN_CONFIDENCE:
-        print(f"   ⏭️  Unknown face NOT saved - low detection confidence ({confidence:.2f} < {MIN_UNKNOWN_CONFIDENCE})")
-        return
-    
-    # Filter 4: Check if face is too close to image edge (likely cropped)
-    frame_height, frame_width = frame.shape[:2]
-    edge_margin = 20  # pixels from edge
-    if (left < edge_margin or top < edge_margin or 
-        right > frame_width - edge_margin or bottom > frame_height - edge_margin):
-        print(f"   ⏭️  Unknown face NOT saved - too close to frame edge (likely cropped)")
-        return
-    
-    # Extract face
+    # Extract face image
     face_image = frame[top:bottom, left:right]
     
-    # Filter 5: Blur detection using Laplacian variance
-    gray_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
-    laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
-    MIN_BLUR_THRESHOLD = 100  # Higher = sharper
-    if laplacian_var < MIN_BLUR_THRESHOLD:
-        print(f"   ⏭️  Unknown face NOT saved - too blurry (variance: {laplacian_var:.1f} < {MIN_BLUR_THRESHOLD})")
-        return
+    # Calculate sharpness for filename (informational only)
+    try:
+        gray_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
+        laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+    except:
+        laplacian_var = 0
     
-    # All filters passed - save the face
+    # Generate filename with metadata
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
     filename = f"{unknown_id}_{timestamp}_size{face_width}x{face_height}_sharp{laplacian_var:.0f}.jpg"
     filepath = os.path.join(UNKNOWN_DIR, filename)
     
+    # Save the face without any filters
     cv2.imwrite(filepath, face_image)
-    print(f"💾 Unknown face saved: {filename} (Quality checks: ✅ Size ✅ Ratio ✅ Confidence ✅ Position ✅ Sharpness)")
+    print(f"💾 Unknown face saved: {filename} (ALL faces saved - no quality filters)")
+
 
 def save_detected_face(frame, face_location, label="detected", confidence=0.0):
     """Save every detected face to the detected_faces directory"""

@@ -20,6 +20,7 @@ app.add_middleware(
 UNKNOWN_FACES_DIR = os.getenv("UNKNOWN_FACES_DIR", "unknown_faces")
 
 @app.get("/api/unknown-faces")
+@app.head("/api/unknown-faces")
 def get_unknown_faces():
     if not os.path.exists(UNKNOWN_FACES_DIR):
         os.makedirs(UNKNOWN_FACES_DIR, exist_ok=True)
@@ -56,12 +57,13 @@ def get_unknown_faces():
             'filename': filename,
             'timestamp': timestamp.isoformat(),
             'size': stats.st_size,
-            'path': f'/api/unknown-faces/image/{filename}'
+            'path': f'/unknown-faces-api/image/{filename}'  # Legacy URL for frontend compatibility
         })
     faces.sort(key=lambda x: x['timestamp'], reverse=True)
     return {"faces": faces, "total": len(faces), "directory": UNKNOWN_FACES_DIR}
 
 @app.get("/api/unknown-faces/image/{filename}")
+@app.head("/api/unknown-faces/image/{filename}")
 def get_unknown_face_image(filename: str):
     if '..' in filename or '/' in filename or '\\' in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")

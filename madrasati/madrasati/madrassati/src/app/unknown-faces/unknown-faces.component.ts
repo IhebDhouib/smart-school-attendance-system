@@ -287,7 +287,15 @@ export class UnknownFacesComponent implements OnInit, OnDestroy {
   }
 
   formatTimestamp(timestamp: string): string {
-    return new Date(timestamp).toLocaleString('ar-EG');
+    return new Date(timestamp).toLocaleString('fr-FR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   }
 
   formatFileSize(bytes: number): string {
