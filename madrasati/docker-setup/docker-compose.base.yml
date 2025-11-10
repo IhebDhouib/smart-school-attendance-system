@@ -114,7 +114,7 @@ services:
       CAMERA_URL: ${CAMERA_URL}
       CAMERA_DEVICE: ${CAMERA_DEVICE:-/dev/video0}
       # InsightFace configuration
-      INSIGHTFACE_MODEL: ${INSIGHTFACE_MODEL:-buffalo_m}
+      INSIGHTFACE_MODEL: ${INSIGHTFACE_MODEL:-buffalo_l}
       USE_GPU: ${USE_GPU:-False}
       DET_SIZE: ${DET_SIZE:-640}
       DET_THRESH: ${DET_THRESH:-0.5}

@@ -57,7 +57,7 @@ RUN mkdir -p \
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app:/app/madrasati:/app/madrasati/face \
     # InsightFace settings
-    INSIGHTFACE_MODEL=buffalo_m \
+    INSIGHTFACE_MODEL=buffalo_l \
     USE_GPU=False \
     DET_SIZE=640 \
     DET_THRESH=0.5 \

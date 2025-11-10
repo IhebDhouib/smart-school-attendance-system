@@ -86,7 +86,7 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:3001")
 
 # 🔍 InsightFace Configuration (SCRFD 2.5G + ArcFace) - Use environment variables
-INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_m")  # 'buffalo_m' uses SCRFD_2.5G detector (faster, balanced accuracy)
+INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' uses RetinaFace detector (more accurate)
 USE_GPU = os.getenv("USE_GPU", "False").lower() == "true"  # Set to True if CUDA is available for GPU acceleration
 DET_SIZE_VALUE = int(os.getenv("DET_SIZE", "640"))
 DET_SIZE = (DET_SIZE_VALUE, DET_SIZE_VALUE)  # Detection input size - larger = better for small faces
