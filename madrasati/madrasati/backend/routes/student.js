@@ -30,7 +30,7 @@ const upload = multer({ storage });
 const convertPhotosToUrls = (student, req) => {
   // Get hostname once at the start
   const host = req.get("host").split(":")[0]; // Get hostname without port
-  
+
   if (student.photos && student.photos.length > 0) {
     student.photos = student.photos.map((photoPath) => {
       // Convert 'uploads/filename.jpg' to proper URL
