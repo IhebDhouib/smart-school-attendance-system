@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 const { WebSocketServer } = require("ws");
 const winston = require("winston");
 const authRoutes = require("./routes/authRoutes");
@@ -43,8 +44,18 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory with CORS headers
-app.use("/uploads", cors(), express.static("uploads"));
+// Serve static files from uploads directory with absolute path
+const uploadsPath = path.join(__dirname, "uploads");
+console.log(`[STATIC] Serving uploads from: ${uploadsPath}`);
+
+// Check if uploads directory exists, create if not
+const fs = require('fs');
+if (!fs.existsSync(uploadsPath)) {
+  console.warn(`[STATIC] Uploads directory not found, creating: ${uploadsPath}`);
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+
+app.use("/uploads", cors(), express.static(uploadsPath));
 
 // Test endpoint to check photo display
 app.get("/test-photo", (req, res) => {
