@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const compression = require("compression");
 const { WebSocketServer } = require("ws");
 const winston = require("winston");
 const authRoutes = require("./routes/authRoutes");
@@ -32,6 +33,12 @@ const logger = winston.createLogger({
 
 const app = express();
 
+// Enable compression for all responses
+app.use(compression({
+  level: 6, // Compression level (0-9)
+  threshold: 1024, // Only compress responses > 1KB
+}));
+
 // Middleware
 app.use(
   cors({
@@ -57,7 +64,17 @@ if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
-app.use("/uploads", cors(), express.static(uploadsPath));
+// Serve uploads with aggressive caching and compression
+app.use(
+  "/uploads",
+  cors(),
+  express.static(uploadsPath, {
+    maxAge: "1y", // Cache for 1 year
+    etag: true,
+    lastModified: true,
+    immutable: true, // Tell browsers these files never change
+  })
+);
 
 // Test endpoint to check photo display
 app.get("/test-photo", (req, res) => {
