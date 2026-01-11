@@ -49,9 +49,11 @@ const uploadsPath = path.join(__dirname, "uploads");
 console.log(`[STATIC] Serving uploads from: ${uploadsPath}`);
 
 // Check if uploads directory exists, create if not
-const fs = require('fs');
+const fs = require("fs");
 if (!fs.existsSync(uploadsPath)) {
-  console.warn(`[STATIC] Uploads directory not found, creating: ${uploadsPath}`);
+  console.warn(
+    `[STATIC] Uploads directory not found, creating: ${uploadsPath}`
+  );
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
