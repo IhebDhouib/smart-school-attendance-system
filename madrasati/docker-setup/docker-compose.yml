@@ -111,13 +111,14 @@ services:
   # Angular Frontend
   frontend:
     build:
-      context: ../../ 
+      context: ../..
       dockerfile: madrasati/docker-setup/Dockerfile.frontend
+      args:
+        - NODE_ENV=production
     container_name: madrasati_frontend
     restart: unless-stopped
     ports:
       - "80:80"
-
     depends_on:
       - backend
     networks:
