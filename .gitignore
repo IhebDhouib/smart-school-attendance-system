@@ -72,3 +72,4 @@ config.local.json
 tmp/
 temp/
 *.tmp
+madrasati/madrasati/backend/config/google-service-account.json

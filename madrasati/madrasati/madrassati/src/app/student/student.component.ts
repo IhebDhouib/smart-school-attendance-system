@@ -44,6 +44,12 @@ export class StudentComponent implements OnInit, AfterViewInit {
   isEditing = false;
   editingStudentId: string | null = null;
   excelFile: File | null = null;
+  
+  // Photo modal
+  showPhotoModal = false;
+  selectedPhoto: string = '';
+  selectedPhotoStudentId: string = '';
+  selectedPhotoIndex: number = -1;
 
   constructor(
     private studentService: StudentService,
@@ -245,6 +251,21 @@ export class StudentComponent implements OnInit, AfterViewInit {
 
   editStudent(student: Student) {
     this.newStudent = { ...student };
+    
+    // Format date for input[type="date"]
+    if (student.dateNaissance) {
+      const date = new Date(student.dateNaissance);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      this.newStudent.dateNaissance = `${year}-${month}-${day}`;
+    }
+    
+    // Extract classId if it's an object
+    if (typeof student.classId === 'object' && student.classId._id) {
+      this.newStudent.classId = student.classId._id;
+    }
+    
     this.isEditing = true;
     this.editingStudentId = student._id || null;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -253,12 +274,24 @@ export class StudentComponent implements OnInit, AfterViewInit {
   updateStudent() {
     if (!this.editingStudentId) return;
 
-    const studentToUpdate = {
-      ...this.newStudent,
-      classId: this.newStudent.classId.toString()
-    };
+    if (!this.newStudent.matricule || !this.newStudent.fullName || !this.newStudent.classId) {
+      alert('Veuillez remplir les champs obligatoires (Matricule, Nom Complet, Classe)');
+      return;
+    }
 
-    this.studentService.updateStudent(this.editingStudentId, studentToUpdate).subscribe({
+    const formData = new FormData();
+    formData.append('matricule', this.newStudent.matricule);
+    formData.append('fullName', this.newStudent.fullName);
+    if (this.newStudent.nomPere) formData.append('nomPere', this.newStudent.nomPere);
+    if (this.newStudent.dateNaissance) formData.append('dateNaissance', this.newStudent.dateNaissance);
+    formData.append('classId', this.newStudent.classId.toString());
+
+    // Add new photos if selected
+    for (let file of this.selectedFiles) {
+      formData.append('photos', file);
+    }
+
+    this.studentService.updateStudentWithPhotos(this.editingStudentId, formData).subscribe({
       next: () => {
         this.getStudents();
         this.resetForm();
@@ -364,5 +397,48 @@ export class StudentComponent implements OnInit, AfterViewInit {
     this.itemsPerPage = parseInt(event.target.value);
     this.currentPage = 1;
     this.updatePagination();
+  }
+
+  getPhotoUrl(photoPath: string): string {
+    if (!photoPath) return '';
+    // If it's already a full URL, return as is
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      return photoPath;
+    }
+    // Otherwise, prepend the API URL
+    const baseUrl = this.studentService.getApiUrl().replace('/students', '');
+    return `${baseUrl}${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
+  }
+
+  openPhotoModal(photoUrl: string, studentId: string, photoIndex: number) {
+    this.selectedPhoto = photoUrl;
+    this.selectedPhotoStudentId = studentId;
+    this.selectedPhotoIndex = photoIndex;
+    this.showPhotoModal = true;
+  }
+
+  closePhotoModal() {
+    this.showPhotoModal = false;
+    this.selectedPhoto = '';
+    this.selectedPhotoStudentId = '';
+    this.selectedPhotoIndex = -1;
+  }
+
+  deletePhoto() {
+    if (!this.selectedPhotoStudentId || this.selectedPhotoIndex === -1) return;
+
+    if (confirm('هل أنت متأكد من حذف هذه الصورة؟')) {
+      this.studentService.deleteStudentPhoto(this.selectedPhotoStudentId, this.selectedPhotoIndex).subscribe({
+        next: () => {
+          console.log('Photo deleted successfully');
+          this.getStudents();
+          this.closePhotoModal();
+        },
+        error: (err) => {
+          console.error('Error deleting photo:', err);
+          alert('حدث خطأ أثناء حذف الصورة');
+        }
+      });
+    }
   }
 }

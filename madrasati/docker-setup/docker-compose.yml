@@ -50,6 +50,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
       # Face API URL for forwarding student photos
       FACE_API_URL: http://face-fused:8000
+      ENABLE_GOOGLE_DRIVE_BACKUP: true
+      GOOGLE_SERVICE_ACCOUNT_PATH: ./config/google-service-account.json
     volumes:
       - backend_uploads:/app/uploads
       - backend_logs:/app/logs
@@ -97,7 +99,7 @@ services:
       # Optional: Mount dataset if you want to manage it from host
       # - ./dataset:/app/madrasati/face/dataset
     ports:
-      - "8000:8000"  # Face Encoding API
+      - "8088:8000"  # Face Encoding API
       - "5001:5001"  # Unknown Faces API
     depends_on:
       - backend

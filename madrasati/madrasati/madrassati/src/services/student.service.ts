@@ -43,8 +43,21 @@ export class StudentService {
   updateStudent(id: string, student: Student): Observable<any> {
     return this.http.put(`${this.apiUrl}/${id}`, student);
   }
+
+  updateStudentWithPhotos(id: string, formData: FormData): Observable<any> {
+    return this.http.put(`${this.apiUrl}/${id}`, formData);
+  }
+
+  deleteStudentPhoto(id: string, photoIndex: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${id}/photos/${photoIndex}`);
+  }
+
   importExcel(formData: FormData): Observable<any> {
-  return this.http.post(`${this.apiUrl}/import-excel`, formData);
-}
+    return this.http.post(`${this.apiUrl}/import-excel`, formData);
+  }
+
+  getApiUrl(): string {
+    return environment.apiUrl;
+  }
 
 }

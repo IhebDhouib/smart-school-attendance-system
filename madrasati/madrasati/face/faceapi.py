@@ -431,6 +431,58 @@ async def delete_student(matricule: str):
         return {"status": "error", "message": str(e)}
 
 
+@app.delete("/students/{matricule}/encodings")
+async def delete_student_encodings(matricule: str):
+    """Delete only the encodings for a student (not the photos) - used when deleting individual photos"""
+    try:
+        print(f"🗑️  Deleting encodings for student: {matricule}")
+        
+        # Load existing encodings
+        known_encodings, known_names, _ = load_existing_encodings(model='arcface')
+        
+        # Remove encodings for this student
+        if matricule in known_names:
+            count = known_names.count(matricule)
+            print(f"🔄 Removing {count} encoding(s) for {matricule}")
+            indices_to_keep = [i for i, name in enumerate(known_names) if name != matricule]
+            known_encodings = [known_encodings[i] for i in indices_to_keep]
+            known_names = [known_names[i] for i in indices_to_keep]
+            
+            # Save updated encodings
+            encodings_file = FACE_MODELS['arcface']['file']
+            data = {
+                'embeddings': known_encodings,
+                'names': known_names,
+                'model': 'arcface',
+                'model_name': FACE_MODELS['arcface']['name'],
+                'created_at': time.strftime("%Y-%m-%d %H:%M:%S"),
+                'total_faces': len(known_encodings),
+                'unique_students': len(set(known_names)),
+                'embedding_dimension': len(known_encodings[0]) if known_encodings else 0
+            }
+            
+            with open(encodings_file, 'wb') as f:
+                pickle.dump(data, f)
+                
+            print(f"✅ Encodings for {matricule} deleted. Remaining: {len(known_encodings)} faces")
+            return {
+                "status": "ok",
+                "message": f"Deleted {count} encoding(s) for {matricule}",
+                "remaining_faces": len(known_encodings),
+                "remaining_students": len(set(known_names))
+            }
+        else:
+            print(f"⚠️  No encodings found for {matricule}")
+            return {
+                "status": "ok",
+                "message": f"No encodings found for {matricule}"
+            }
+            
+    except Exception as e:
+        print(f"❌ Error deleting encodings for {matricule}: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @app.delete("/students/{matricule}/{model}")
 async def delete_student_single_model(matricule: str, model: str):
     """Delete student and re-encode with ArcFace"""
@@ -477,7 +529,12 @@ def encode_single_student(matricule, model='arcface'):
             # Detect faces with RetinaFace and get ArcFace embeddings
             faces = face_app.get(image)
             
-            if not faces or len(faces) == 0:
+            # Check if faces is None or empty
+            if faces is None:
+                print(f"⚠️  No faces detected in {image_name} (returned None)")
+                continue
+            
+            if len(faces) == 0:
                 print(f"⚠️  No faces found in {image_name}")
                 continue
             
@@ -574,7 +631,12 @@ def encode_faces_from_dataset(model='arcface'):
                 # Detect faces with RetinaFace and get ArcFace embeddings
                 faces = face_app.get(image)
                 
-                if not faces or len(faces) == 0:
+                # Check if faces is None or empty
+                if faces is None:
+                    print(f"⚠️  No faces detected in {image_name} using RetinaFace (returned None)")
+                    continue
+                
+                if len(faces) == 0:
                     print(f"⚠️  No faces found in {image_name} using RetinaFace")
                     continue
                 

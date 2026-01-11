@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const axios = require("axios");
 const FormData = require("form-data");
+const googleDriveBackup = require("../services/googleDriveBackup");
 // Allow configuring the Face API URL via environment variable for local vs docker
 const FACE_API_URL = process.env.FACE_API_URL || "http://face-fused:8000";
 
@@ -177,6 +178,55 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
     const studentObj = student.toObject();
     const studentWithUrls = convertPhotosToUrls(studentObj, req);
 
+    // 📁 Google Drive Backup - run asynchronously
+    if (
+      photoPaths.length > 0 &&
+      process.env.ENABLE_GOOGLE_DRIVE_BACKUP === "true"
+    ) {
+      console.log(
+        `[GOOGLE_DRIVE] Starting backup for student ${student.matricule}`
+      );
+
+      // Initialize Google Drive backup service if not already done
+      googleDriveBackup
+        .initialize()
+        .then(() => {
+          // Prepare photo files for backup
+          const photoFiles = photoPaths.map((photoPath) => ({
+            path: path.resolve(photoPath),
+            originalname: path.basename(photoPath),
+          }));
+
+          // Backup photos to Google Drive (non-blocking)
+          googleDriveBackup
+            .backupStudentPhotos(student, photoFiles)
+            .then((result) => {
+              if (result.success) {
+                console.log(
+                  `✅ [GOOGLE_DRIVE] Successfully backed up ${result.successfulUploads}/${result.totalFiles} photos for student ${student.matricule}`
+                );
+              } else {
+                console.error(
+                  `❌ [GOOGLE_DRIVE] Backup failed for student ${student.matricule}:`,
+                  result.error
+                );
+              }
+            })
+            .catch((error) => {
+              console.error(
+                `❌ [GOOGLE_DRIVE] Backup error for student ${student.matricule}:`,
+                error.message
+              );
+            });
+        })
+        .catch((error) => {
+          console.error(
+            "❌ [GOOGLE_DRIVE] Failed to initialize Google Drive service:",
+            error.message
+          );
+        });
+    }
+
     res.status(201).json(studentWithUrls);
   } catch (err) {
     console.error("[ADD_STUDENT] Error:", err);
@@ -193,6 +243,99 @@ router.post("/", upload.array("photos", 5), async (req, res) => {
     }
 
     res.status(500).json({ error: "Erreur interne du serveur" });
+  }
+});
+
+// =============================
+// DELETE SPECIFIC PHOTO FROM STUDENT
+// =============================
+router.delete("/:id/photos/:photoIndex", async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ error: "Étudiant non trouvé" });
+
+    const photoIndex = parseInt(req.params.photoIndex);
+    if (photoIndex < 0 || photoIndex >= student.photos.length) {
+      return res.status(400).json({ error: "Index de photo invalide" });
+    }
+
+    const photoPath = student.photos[photoIndex];
+    console.log(
+      `[DELETE_PHOTO] Deleting photo ${photoIndex} for student ${student.matricule}: ${photoPath}`
+    );
+
+    // Remove photo from array
+    student.photos.splice(photoIndex, 1);
+    await student.save();
+
+    // Delete physical file
+    try {
+      const absolutePath = path.resolve(photoPath);
+      if (fs.existsSync(absolutePath)) {
+        fs.unlinkSync(absolutePath);
+        console.log(`✅ [DELETE_PHOTO] Physical file deleted: ${absolutePath}`);
+      }
+    } catch (err) {
+      console.error(
+        `⚠️  [DELETE_PHOTO] Could not delete physical file:`,
+        err.message
+      );
+    }
+
+    // 🔥 Re-encode student faces (remove old encoding and re-encode remaining photos)
+    if (student.photos.length > 0) {
+      console.log(
+        `[FACE_API] Re-encoding remaining photos for student ${student.matricule}`
+      );
+      try {
+        // First delete all encodings for this student
+        await axios.delete(
+          `${FACE_API_URL}/students/${student.matricule}/encodings`
+        );
+
+        // Then re-encode remaining photos
+        for (let i = 0; i < student.photos.length; i++) {
+          const remainingPhotoPath = student.photos[i];
+          const absolutePath = path.resolve(remainingPhotoPath);
+
+          if (fs.existsSync(absolutePath)) {
+            const form = new FormData();
+            form.append("matricule", student.matricule);
+            form.append("photo", fs.createReadStream(absolutePath));
+
+            await axios.post(`${FACE_API_URL}/students/add`, form, {
+              headers: form.getHeaders(),
+              timeout: 30000,
+            });
+          }
+        }
+        console.log(
+          `✅ [FACE_API] Re-encoded ${student.photos.length} remaining photos`
+        );
+      } catch (err) {
+        console.error(
+          "❌ [FACE_API] Error re-encoding after photo deletion:",
+          err.message
+        );
+      }
+    } else {
+      // No photos left, delete all encodings
+      console.log(
+        `[FACE_API] No photos left, deleting all encodings for ${student.matricule}`
+      );
+      try {
+        await axios.delete(
+          `${FACE_API_URL}/students/${student.matricule}/encodings`
+        );
+      } catch (err) {
+        console.error("❌ [FACE_API] Error deleting encodings:", err.message);
+      }
+    }
+
+    res.json({ message: "Photo supprimée avec succès", student });
+  } catch (err) {
+    console.error("[DELETE_PHOTO] Error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -233,12 +376,27 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
       contentType: req.headers["content-type"],
     });
 
+    // Get existing student first
+    const existingStudent = await Student.findById(req.params.id);
+    if (!existingStudent)
+      return res.status(404).json({ error: "Étudiant non trouvé" });
+
     const updateData = { ...req.body };
 
-    // Safe file handling - only process files if they exist and are an array
+    // Track new photos separately for encoding
+    let newPhotoPaths = [];
+
+    // Safe file handling - append new photos to existing ones
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      const photoPaths = req.files.map((file) => file.path);
-      updateData.photos = photoPaths;
+      newPhotoPaths = req.files.map((file) => file.path);
+
+      // Append new photos to existing photos instead of replacing
+      const existingPhotos = existingStudent.photos || [];
+      updateData.photos = [...existingPhotos, ...newPhotoPaths];
+
+      console.log(`[UPDATE_STUDENT] Existing photos: ${existingPhotos.length}`);
+      console.log(`[UPDATE_STUDENT] New photos: ${newPhotoPaths.length}`);
+      console.log(`[UPDATE_STUDENT] Total photos: ${updateData.photos.length}`);
     }
 
     const student = await Student.findByIdAndUpdate(req.params.id, updateData, {
@@ -246,23 +404,22 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
       runValidators: true,
     });
 
-    if (!student) return res.status(404).json({ error: "Étudiant non trouvé" });
-
-    // 🔥 If new photos uploaded, re-trigger encoding via API
-    if (student.photos && student.photos.length > 0) {
+    // 🔥 Only encode NEW photos (not all photos again)
+    if (newPhotoPaths.length > 0) {
       console.log(
-        `[FACE_API] Starting face re-encoding for updated student ${student.matricule}`
+        `[FACE_API] Starting face encoding for ${newPhotoPaths.length} NEW photos of student ${student.matricule}`
       );
-      console.log(`[FACE_API] Photos to encode: ${student.photos.length}`);
 
       try {
-        for (let i = 0; i < student.photos.length; i++) {
-          const photoPath = student.photos[i];
+        for (let i = 0; i < newPhotoPaths.length; i++) {
+          const photoPath = newPhotoPaths[i];
           const absolutePath = path.resolve(photoPath);
 
           console.log(
-            `📤 [FACE_API] Sending photo ${i + 1}/${student.photos.length}`
+            `📤 [FACE_API] Sending NEW photo ${i + 1}/${newPhotoPaths.length}`
           );
+          console.log(`   Matricule: ${student.matricule}`);
+          console.log(`   File path: ${photoPath}`);
           console.log(`   File exists: ${fs.existsSync(absolutePath)}`);
 
           const form = new FormData();
@@ -279,12 +436,12 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
           );
 
           console.log(
-            `✅ [FACE_API] Photo ${i + 1} update encoded successfully:`,
+            `✅ [FACE_API] NEW photo ${i + 1} encoded successfully:`,
             response.data
           );
         }
         console.log(
-          `✅ [FACE_API] All ${student.photos.length} photos re-encoded for student ${student.matricule}`
+          `✅ [FACE_API] All ${newPhotoPaths.length} NEW photos encoded for student ${student.matricule}`
         );
       } catch (err) {
         console.error("❌ [FACE_API] Face API error (update student):", {
@@ -293,12 +450,68 @@ router.put("/:id", upload.array("photos", 5), async (req, res) => {
           status: err.response?.status,
           data: err.response?.data,
         });
+        console.warn(
+          "⚠️  [FACE_API] Student updated in DB but face encoding failed"
+        );
       }
+    } else {
+      console.log(
+        `[UPDATE_STUDENT] No new photos to encode for student ${student.matricule}`
+      );
     }
 
     // Convert photo paths to URLs before returning
     const studentObj = student.toObject();
     const studentWithUrls = convertPhotosToUrls(studentObj, req);
+
+    // 📁 Google Drive Backup for NEW photos only - run asynchronously
+    if (
+      newPhotoPaths.length > 0 &&
+      process.env.ENABLE_GOOGLE_DRIVE_BACKUP === "true"
+    ) {
+      console.log(
+        `[GOOGLE_DRIVE] Starting backup for ${newPhotoPaths.length} NEW photos of student ${student.matricule}`
+      );
+
+      // Initialize Google Drive backup service if not already done
+      googleDriveBackup
+        .initialize()
+        .then(() => {
+          // Prepare NEW photo files for backup
+          const photoFiles = newPhotoPaths.map((photoPath) => ({
+            path: path.resolve(photoPath),
+            originalname: path.basename(photoPath),
+          }));
+
+          // Backup photos to Google Drive (non-blocking)
+          googleDriveBackup
+            .backupStudentPhotos(student, photoFiles)
+            .then((result) => {
+              if (result.success) {
+                console.log(
+                  `✅ [GOOGLE_DRIVE] Successfully backed up ${result.successfulUploads}/${result.totalFiles} NEW photos for student ${student.matricule}`
+                );
+              } else {
+                console.error(
+                  `❌ [GOOGLE_DRIVE] Backup failed for updated student ${student.matricule}:`,
+                  result.error
+                );
+              }
+            })
+            .catch((error) => {
+              console.error(
+                `❌ [GOOGLE_DRIVE] Backup error for updated student ${student.matricule}:`,
+                error.message
+              );
+            });
+        })
+        .catch((error) => {
+          console.error(
+            "❌ [GOOGLE_DRIVE] Failed to initialize Google Drive service:",
+            error.message
+          );
+        });
+    }
 
     res.json(studentWithUrls);
   } catch (err) {

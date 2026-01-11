@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -9,6 +11,7 @@ const studentRoutes = require("./routes/student");
 const attendanceRoutes = require("./routes/attendance");
 const faceEncodingRoutes = require("./routes/face-encoding");
 const cameraRoutes = require("./routes/camera");
+const backupRoutes = require("./routes/backup");
 const Attendance = require("./models/Attendance");
 const Student = require("./models/Student");
 const Classroom = require("./models/Classroom"); // Ensure Classroom is imported
@@ -79,6 +82,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/face-encoding", faceEncodingRoutes);
 app.use("/api/cameras", cameraRoutes);
+app.use("/api/backup", backupRoutes);
 app.use("/api/auth", authRoutes);
 
 // MongoDB Connection

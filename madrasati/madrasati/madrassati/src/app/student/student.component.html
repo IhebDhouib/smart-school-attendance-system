@@ -195,7 +195,12 @@
               <td class="td-class">{{ getClassroomName(student.classId) }}</td>
               <td class="td-photos">
                 <div class="photos">
-                  <img *ngFor="let p of student.photos" [src]="p" alt="photo" />
+                  <img *ngFor="let p of student.photos; let i = index" 
+                       [src]="getPhotoUrl(p)" 
+                       alt="photo" 
+                       (click)="openPhotoModal(getPhotoUrl(p), student._id!, i)"
+                       style="cursor: pointer;"
+                       title="انقر لعرض الصورة" />
                   <span *ngIf="!student.photos || student.photos.length === 0" class="no-photo">
                     <i class="fas fa-image"></i>
                   </span>
@@ -252,6 +257,19 @@
       <div *ngIf="filteredStudents.length === 0" class="empty-state">
         <i class="fas fa-user-slash"></i>
         <p>لم يتم العثور على أي تلميذ بهذه المعايير.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Modal -->
+  <div class="photo-modal" *ngIf="showPhotoModal" (click)="closePhotoModal()">
+    <div class="photo-modal-content" (click)="$event.stopPropagation()">
+      <span class="photo-modal-close" (click)="closePhotoModal()">&times;</span>
+      <img [src]="selectedPhoto" alt="Student Photo" class="photo-modal-image" />
+      <div class="photo-modal-actions">
+        <button class="btn-delete-photo" (click)="deletePhoto()">
+          <i class="fas fa-trash-alt"></i> حذف الصورة
+        </button>
       </div>
     </div>
   </div>
