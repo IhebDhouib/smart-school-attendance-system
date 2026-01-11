@@ -448,3 +448,201 @@
 {"level":"info","message":"Connected to MongoDB","timestamp":"2025-08-19T00:24:12.881Z"}
 {"level":"info","message":"Express server running on port 3000","timestamp":"2025-10-26T19:58:16.586Z"}
 {"error":"getaddrinfo ENOTFOUND mongodb","level":"error","message":"MongoDB connection error","stack":"MongooseServerSelectionError: getaddrinfo ENOTFOUND mongodb\n    at _handleConnectionErrors (C:\\Users\\USER\\Desktop\\smart-school-attendance-system\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1165:11)\n    at NativeConnection.openUri (C:\\Users\\USER\\Desktop\\smart-school-attendance-system\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1096:11)","timestamp":"2025-10-26T19:58:46.584Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:25:56.997Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:13.756Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:13.765Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:13.789Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:15.728Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:16.765Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:18.764Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:18.769Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:21.771Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:21.774Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:24.777Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:24.779Z","totalClients":1}
+{"error":"getaddrinfo ENOTFOUND mongodb","level":"error","message":"MongoDB connection error","stack":"MongooseServerSelectionError: getaddrinfo ENOTFOUND mongodb\n    at _handleConnectionErrors (C:\\Users\\ihedh\\Downloads\\madrasatiarabe\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1165:11)\n    at NativeConnection.openUri (C:\\Users\\ihedh\\Downloads\\madrasatiarabe\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1096:11)","timestamp":"2025-12-05T09:26:26.988Z"}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:27.782Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:27.783Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:30.789Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:30.790Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:33.793Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:33.795Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:36.795Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:36.796Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:39.806Z","totalClients":2}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:39.807Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:42.812Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:42.815Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:45.821Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:45.824Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:48.822Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:48.824Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:51.826Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:51.828Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:55.238Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:55.240Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:26:59.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:26:59.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:03.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:03.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:07.244Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:07.248Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:11.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:11.245Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:15.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:15.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:19.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:19.246Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:23.234Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:23.239Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:27.239Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:27.242Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:31.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:31.245Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:35.232Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:35.234Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:39.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:39.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:43.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:43.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:47.234Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:47.236Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:51.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:51.246Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:55.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:55.233Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:27:59.241Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:27:59.244Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:03.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:03.236Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:07.233Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:07.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:11.238Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:11.242Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:15.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:15.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:19.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:19.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:23.246Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:23.251Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:27.247Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:27.249Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:31.241Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:31.243Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:35.240Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:35.245Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:39.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:39.246Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:43.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:43.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:47.242Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:47.243Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:51.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:51.232Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:55.239Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:55.241Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:28:59.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:28:59.245Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:03.237Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:03.240Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:07.245Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:07.284Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:11.233Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:11.236Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:15.230Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:15.233Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:19.245Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:19.249Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:23.237Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:23.238Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:27.241Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:27.242Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:31.233Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:31.235Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:35.239Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:35.242Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:39.232Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:39.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:43.239Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:43.241Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:47.240Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:47.241Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:51.244Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:51.251Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:55.234Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:55.239Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:29:59.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:29:59.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:03.240Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:03.243Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:07.245Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:07.247Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:11.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:11.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:15.234Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:15.236Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:19.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:19.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:23.244Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:23.246Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:27.243Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:27.247Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:31.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:31.233Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:35.233Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:35.234Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:39.230Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:39.232Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:43.244Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:43.248Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:47.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:47.239Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:51.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:51.234Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:55.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:55.232Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:30:59.236Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:30:59.239Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:31:03.239Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:03.240Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:31:07.231Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:07.236Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:31:11.241Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:11.243Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:31:15.235Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:15.237Z","totalClients":1}
+{"clientIp":"::1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:31:19.234Z","totalClients":0}
+{"clientIp":"::1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:19.238Z","totalClients":1}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:31:38.387Z"}
+{"clientIp":"::ffff:127.0.0.1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:31:38.560Z","totalClients":1}
+{"error":"getaddrinfo ENOTFOUND mongodb","level":"error","message":"MongoDB connection error","stack":"MongooseServerSelectionError: getaddrinfo ENOTFOUND mongodb\n    at _handleConnectionErrors (C:\\Users\\ihedh\\Downloads\\madrasatiarabe\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1165:11)\n    at NativeConnection.openUri (C:\\Users\\ihedh\\Downloads\\madrasatiarabe\\madrasati\\madrasati\\backend\\node_modules\\mongoose\\lib\\connection.js:1096:11)\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:internal/timers:555:9)\n    at process.processTimers (node:internal/timers:529:7)","timestamp":"2025-12-05T09:32:08.393Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:33:17.922Z"}
+{"clientIp":"::ffff:127.0.0.1","level":"info","message":"WebSocket client connected","timestamp":"2025-12-05T09:33:18.060Z","totalClients":1}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T09:33:18.221Z"}
+{"clientIp":"::ffff:127.0.0.1","level":"info","message":"WebSocket client disconnected","timestamp":"2025-12-05T09:33:29.992Z","totalClients":0}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:39:28.225Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T09:39:28.277Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:43:40.608Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T09:43:41.008Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:45:49.908Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T09:45:49.999Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T09:56:16.170Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T09:56:16.231Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T12:41:39.515Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T12:41:39.599Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T13:01:13.678Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T13:01:13.771Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T13:03:11.666Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T13:03:11.736Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T13:05:47.394Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T13:05:47.464Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2025-12-05T13:10:01.308Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-12-05T13:10:01.389Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2026-01-06T21:08:54.051Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2026-01-06T21:08:54.288Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2026-01-11T09:46:11.851Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2026-01-11T09:46:11.909Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2026-01-11T18:12:24.504Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2026-01-11T18:12:24.614Z"}
+{"level":"info","message":"Express server running on port 3000","timestamp":"2026-01-11T18:50:10.040Z"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2026-01-11T18:50:10.167Z"}

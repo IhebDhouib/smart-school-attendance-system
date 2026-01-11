@@ -32,8 +32,9 @@ const convertPhotosToUrls = (student, req) => {
     student.photos = student.photos.map((photoPath) => {
       // Convert 'uploads/filename.jpg' to proper URL
       if (photoPath && !photoPath.startsWith("http")) {
-        const baseUrl = `${req.protocol}://${req.get("host")}`;
-        const absoluteUrl = `${baseUrl}/${photoPath}`;
+        // Use backend port 3000 directly to bypass nginx issues
+        const host = req.get("host").split(':')[0]; // Get hostname without port
+        const absoluteUrl = `http://${host}:3000/${photoPath}`;
 
         console.log(`[PHOTO_URL] Converting ${photoPath} to ${absoluteUrl}`);
         return absoluteUrl;
@@ -55,7 +56,7 @@ const convertPhotosToUrls = (student, req) => {
       photoCount: student.photos.length,
       firstPhotoUrl: student.photos[0],
       relativeUrl: student.photosRelative[0],
-      testPageUrl: `${req.protocol}://${req.get("host")}/test-photo`,
+      testPageUrl: `http://${host}:3000/test-photo`,
     };
   } else {
     student.photoDebug = {
