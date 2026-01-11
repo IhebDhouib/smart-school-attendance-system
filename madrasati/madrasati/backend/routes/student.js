@@ -28,12 +28,14 @@ const upload = multer({ storage });
 
 // Helper function to convert local file paths to HTTP URLs
 const convertPhotosToUrls = (student, req) => {
+  // Get hostname once at the start
+  const host = req.get("host").split(":")[0]; // Get hostname without port
+  
   if (student.photos && student.photos.length > 0) {
     student.photos = student.photos.map((photoPath) => {
       // Convert 'uploads/filename.jpg' to proper URL
       if (photoPath && !photoPath.startsWith("http")) {
         // Use backend port 3000 directly to bypass nginx issues
-        const host = req.get("host").split(':')[0]; // Get hostname without port
         const absoluteUrl = `http://${host}:3000/${photoPath}`;
 
         console.log(`[PHOTO_URL] Converting ${photoPath} to ${absoluteUrl}`);
