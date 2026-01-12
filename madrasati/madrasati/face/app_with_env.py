@@ -661,6 +661,38 @@ def listen_for_quit():
         except:
             pass
 
+def reconnect_camera(camera_data, max_retries=5):
+    """Reconnect to RTSP camera with retry logic"""
+    for attempt in range(1, max_retries + 1):
+        print(f"🔄 Tentative de reconnexion {attempt}/{max_retries} pour {camera_data['name']}")
+        
+        try:
+            cap = cv2.VideoCapture(camera_data['url'], cv2.CAP_FFMPEG)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                ret, frame = cap.read()
+                if ret:
+                    print(f"✅ Caméra reconnectée avec succès (tentative {attempt})")
+                    return cap
+                else:
+                    cap.release()
+            else:
+                if cap:
+                    cap.release()
+        except Exception as e:
+            print(f"❌ Erreur lors de la tentative {attempt}: {e}")
+        
+        if attempt < max_retries:
+            print(f"⏳ Attente de 2 secondes avant nouvelle tentative...")
+            time.sleep(2)
+    
+    print(f"❌ Échec de reconnexion après {max_retries} tentatives")
+    return None
+
 def initialize_single_camera():
     """Initialize the single hardcoded camera"""
     print(f"🔄 Tentative de connexion à la caméra {SINGLE_CAMERA_NAME}...")
@@ -1103,6 +1135,8 @@ def main():
     
     frame_skip_counter = 0
     websocket_check_counter = 0
+    camera_failure_count = 0  # Track consecutive failures
+    MAX_CAMERA_FAILURES = 10  # Restart container after 10 failures
 
     try:
         while not shutdown_event.is_set():
@@ -1121,9 +1155,29 @@ def main():
             ret, frame = cap.read()
             
             if not ret:
-                print(f"❌ Erreur lecture caméra {camera_name}")
+                camera_failure_count += 1
+                print(f"❌ Erreur lecture caméra {camera_name} (échec {camera_failure_count}/{MAX_CAMERA_FAILURES})")
+                
+                # Try to reconnect after 3 consecutive failures
+                if camera_failure_count >= 3:
+                    print("🔄 Tentative de reconnexion de la caméra...")
+                    cap.release()
+                    new_cap = reconnect_camera(camera_data, max_retries=5)
+                    
+                    if new_cap:
+                        cap = new_cap
+                        camera_failure_count = 0  # Reset failure counter
+                        print("✅ Caméra reconnectée avec succès - reprise du traitement")
+                    elif camera_failure_count >= MAX_CAMERA_FAILURES:
+                        print("❌ Nombre maximum d'échecs atteint - arrêt pour redémarrage du conteneur")
+                        shutdown_event.set()
+                        sys.exit(1)  # Exit with error code to trigger container restart
+                
                 time.sleep(1)
                 continue
+            
+            # Reset failure counter on successful frame read
+            camera_failure_count = 0
             
             # Increment frame skip counter
             frame_skip_counter += 1
