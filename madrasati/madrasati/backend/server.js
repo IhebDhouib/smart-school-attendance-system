@@ -34,10 +34,12 @@ const logger = winston.createLogger({
 const app = express();
 
 // Enable compression for all responses
-app.use(compression({
-  level: 6, // Compression level (0-9)
-  threshold: 1024, // Only compress responses > 1KB
-}));
+app.use(
+  compression({
+    level: 6, // Compression level (0-9)
+    threshold: 1024, // Only compress responses > 1KB
+  })
+);
 
 // Middleware
 app.use(
