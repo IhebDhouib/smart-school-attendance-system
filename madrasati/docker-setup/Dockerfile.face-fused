@@ -67,7 +67,7 @@ ENV PYTHONUNBUFFERED=1 \
     WEBSOCKET_URL=ws://backend:3001
 
 # Expose ports
-EXPOSE 8000 5001
+EXPOSE 8000 5001 8501
 
 # Copy and make startup script executable
 COPY docker-setup/start_face_services_fused.sh /app/

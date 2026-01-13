@@ -56,6 +56,13 @@ uvicorn unknown_faces_api_fastapi:app --host 0.0.0.0 --port 5001 --reload --log-
 UNKNOWN_API_PID=$!
 echo "✅ Unknown Faces API started with PID $UNKNOWN_API_PID (auto-reload enabled)"
 
+# Start Streamlit Dataset Viewer (port 8501)
+echo "📊 Starting Streamlit Dataset Viewer (port 8501)..."
+cd /app/madrasati/face
+streamlit run streamlit_dataset_viewer.py --server.port 8501 --server.address 0.0.0.0 --server.headless true &
+STREAMLIT_PID=$!
+echo "✅ Streamlit started with PID $STREAMLIT_PID"
+
 # Give APIs time to start
 sleep 3
 
@@ -72,6 +79,7 @@ echo "=================================================="
 echo "✅ All services started successfully!"
 echo "   - Face API:        http://0.0.0.0:8000"
 echo "   - Unknown API:     http://0.0.0.0:5001"
+echo "   - Streamlit:       http://0.0.0.0:8501"
 echo "   - Detection App:   Running in background"
 echo "=================================================="
 echo ""
@@ -81,8 +89,8 @@ echo "📊 Process monitoring active..."
 cleanup() {
     echo ""
     echo "🛑 Shutting down services..."
-    kill $FACEAPI_PID $UNKNOWN_API_PID $APP_PID 2>/dev/null || true
-    wait $FACEAPI_PID $UNKNOWN_API_PID $APP_PID 2>/dev/null || true
+    kill $FACEAPI_PID $UNKNOWN_API_PID $STREAMLIT_PID $APP_PID 2>/dev/null || true
+    wait $FACEAPI_PID $UNKNOWN_API_PID $STREAMLIT_PID $APP_PID 2>/dev/null || true
     echo "✅ All services stopped"
     exit 0
 }
@@ -104,6 +112,13 @@ while true; do
         cd /app/docker-setup
         uvicorn unknown_faces_api_fastapi:app --host 0.0.0.0 --port 5001 --reload --log-level info &
         UNKNOWN_API_PID=$!
+    fi
+    
+    if ! kill -0 $STREAMLIT_PID 2>/dev/null; then
+        echo "❌ Streamlit died! Restarting..."
+        cd /app/madrasati/face
+        streamlit run streamlit_dataset_viewer.py --server.port 8501 --server.address 0.0.0.0 --server.headless true &
+        STREAMLIT_PID=$!
     fi
     
     if ! kill -0 $APP_PID 2>/dev/null; then

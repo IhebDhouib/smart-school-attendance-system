@@ -38,6 +38,11 @@ psutil==5.9.6
 pandas==2.0.3
 
 # ============================================
+# Monitoring & Visualization
+# ============================================
+streamlit==1.29.0
+
+# ============================================
 # Optional: GPU Support
 # ============================================
 # If you have CUDA GPU, replace onnxruntime with:

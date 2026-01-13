@@ -293,7 +293,7 @@ router.delete("/:id/photos/:photoIndex", async (req, res) => {
       try {
         // First delete all encodings for this student
         await axios.delete(
-          `${FACE_API_URL}/students/${student.matricule}/encodings`
+          `${FACE_API_URL}/students/${student.matricule}`
         );
 
         // Then re-encode remaining photos

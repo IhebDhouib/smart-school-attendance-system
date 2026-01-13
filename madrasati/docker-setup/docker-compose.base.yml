@@ -133,6 +133,7 @@ services:
     ports:
       - "${FACE_API_PORT:-8000}:8000"  # Face Encoding API
       - "${UNKNOWN_FACES_PORT:-5001}:5001"  # Unknown Faces API
+      - "${STREAMLIT_PORT:-8501}:8501"  # Streamlit Dataset Viewer
     depends_on:
       backend:
         condition: service_healthy
