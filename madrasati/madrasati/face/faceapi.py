@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 from PIL import Image, ImageEnhance
 import time
+import logging
 from collections import Counter
 from fastapi import FastAPI, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,18 @@ import shutil
 import base64
 import io
 from insightface.app import FaceAnalysis
+
+# Configure logging
+LOG_FILE = os.getenv('FACE_API_LOG_FILE', 'logs/face_api_logs.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8'),
+        logging.StreamHandler()  # Also print to console
+    ]
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -48,6 +61,7 @@ face_app = None
 def initialize_insightface():
     """Initialize InsightFace FaceAnalysis model"""
     global face_app
+    logger.info("🔧 Initializing InsightFace model...")
     try:
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
         
@@ -162,6 +176,7 @@ def load_existing_encodings(model='arcface'):
 
 @app.post("/students/add")
 async def add_student(request: Request):
+    logger.info("📥 API Call: POST /students/add")
     """Add student and encode face using ArcFace.
 
     This endpoint accepts multipart/form-data with fields:
@@ -289,6 +304,7 @@ async def add_student(request: Request):
 @app.get("/students/encodings/status")
 async def get_encodings_status(model: str = 'arcface'):
     """Get status of ArcFace encodings"""
+    logger.info(f"📊 API Call: GET /students/encodings/status?model={model}")
     try:
         if model not in FACE_MODELS:
             return {"status": "error", "message": f"Invalid model. Use: {list(FACE_MODELS.keys())}"}
@@ -344,8 +360,10 @@ async def get_both_encodings_status():
 @app.post("/students/encodings/rebuild")
 async def rebuild_encodings():
     """Force rebuild all encodings from dataset using ArcFace"""
+    logger.info("🔨 API Call: POST /students/encodings/rebuild")
     try:
         print("🔨 Force rebuilding all encodings using ArcFace (512-dim)...")
+        logger.info("Starting full encodings rebuild...")
         
         success = encode_faces_from_dataset(model='arcface')
         
@@ -395,44 +413,119 @@ async def rebuild_single_model_encodings(model: str):
         print(f"❌ Error rebuilding {model} encodings: {e}")
         return {"status": "error", "message": str(e)}
 
+@app.post("/students/encodings")
+async def encode_student_by_id(request: Request):
+    """Encode faces for a specific student by student_id"""
+    try:
+        body = await request.json()
+        student_id = body.get('student_id')
+        logger.info(f"🔄 API Call: POST /students/encodings - student_id={student_id}")
+        
+        if not student_id:
+            return {"status": "error", "message": "Missing 'student_id' field"}
+        
+        print(f"🔄 Encoding student: {student_id} with ArcFace")
+        
+        # Check if student directory exists
+        student_dir = os.path.join(DATASET_DIR, student_id)
+        if not os.path.exists(student_dir):
+            return {
+                "status": "error", 
+                "message": f"Student directory not found: {student_id}"
+            }
+        
+        # Count images
+        images = [f for f in os.listdir(student_dir) 
+                 if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+        
+        if not images:
+            return {
+                "status": "error",
+                "message": f"No images found for student: {student_id}"
+            }
+        
+        # Encode this specific student
+        success = encode_single_student(student_id, model='arcface')
+        
+        if success:
+            return {
+                "status": "ok",
+                "message": f"Successfully encoded {student_id}",
+                "images_processed": len(images),
+                "student_id": student_id,
+                "model": "arcface"
+            }
+        else:
+            return {
+                "status": "fail",
+                "message": f"Failed to encode {student_id}",
+                "student_id": student_id
+            }
+            
+    except Exception as e:
+        print(f"❌ Error encoding student: {e}")
+        return {"status": "error", "message": str(e)}
+
 
 @app.delete("/students/{matricule}")
 async def delete_student(matricule: str):
-    """Delete student and re-encode with ArcFace"""
+    logger.info(f"🗑️ API Call: DELETE /students/{matricule}")
+    
+    """Delete student WITHOUT re-encoding entire database"""
     try:
-        print(f"🗑️  Deleting student: {matricule} and re-encoding with ArcFace")
+        print(f"🗑️  Deleting student: {matricule}")
         
+        # Delete photos
         student_dir = os.path.join(DATASET_DIR, matricule)
         if os.path.exists(student_dir):
             shutil.rmtree(student_dir)
             print(f"📁 Removed directory: {student_dir}")
-        else:
-            print(f"⚠️  Directory not found: {student_dir}")
-
-        # Re-encode with ArcFace after deletion
-        print("🧠 Re-encoding remaining faces with ArcFace...")
-        success = encode_faces_from_dataset(model='arcface')
         
-        if success:
+        # ✅ OPTIMIZED: Remove only this student's encodings
+        known_encodings, known_names, _ = load_existing_encodings(model='arcface')
+        
+        if matricule in known_names:
+            count = known_names.count(matricule)
+            print(f"🔄 Removing {count} encoding(s) for {matricule}")
+            
+            indices_to_keep = [i for i, name in enumerate(known_names) if name != matricule]
+            known_encodings = [known_encodings[i] for i in indices_to_keep]
+            known_names = [known_names[i] for i in indices_to_keep]
+            
+            # Save updated encodings WITHOUT re-encoding
+            encodings_file = FACE_MODELS['arcface']['file']
+            data = {
+                'embeddings': known_encodings,
+                'names': known_names,
+                'model': 'arcface',
+                'model_name': FACE_MODELS['arcface']['name'],
+                'created_at': time.strftime("%Y-%m-%d %H:%M:%S"),
+                'total_faces': len(known_encodings),
+                'unique_students': len(set(known_names)),
+                'embedding_dimension': len(known_encodings[0]) if known_encodings else 0
+            }
+            
+            with open(encodings_file, 'wb') as f:
+                pickle.dump(data, f)
+            
+            print(f"✅ Student {matricule} deleted ({count} encodings removed)")
             return {
-                "status": "ok", 
-                "message": f"Student {matricule} deleted and ArcFace re-encoded successfully",
-                "model": "arcface"
+                "status": "ok",
+                "message": f"Student {matricule} deleted successfully",
+                "encodings_removed": count,
+                "remaining_faces": len(known_encodings)
             }
         else:
-            return {
-                "status": "fail", 
-                "message": f"Student {matricule} deleted but ArcFace re-encoding failed",
-                "model": "arcface"
-            }
+            print(f"⚠️  No encodings found for {matricule}")
+            return {"status": "ok", "message": f"Student {matricule} deleted (no encodings found)"}
             
     except Exception as e:
         print(f"❌ Error deleting student {matricule}: {e}")
         return {"status": "error", "message": str(e)}
 
-
 @app.delete("/students/{matricule}/encodings")
 async def delete_student_encodings(matricule: str):
+    logger.info(f"🗑️ API Call: DELETE /students/{matricule}/encodings")
     """Delete only the encodings for a student (not the photos) - used when deleting individual photos"""
     try:
         print(f"🗑️  Deleting encodings for student: {matricule}")
@@ -493,9 +586,11 @@ def encode_single_student(matricule, model='arcface'):
     """Encode faces for a single student (not entire dataset) to avoid duplicates"""
     if model not in FACE_MODELS:
         print(f"❌ Invalid model: {model}. Use: {list(FACE_MODELS.keys())}")
+        logger.error(f"Invalid model specified: {model}")
         return False
     
     print(f"🔄 Encoding single student: {matricule} with {FACE_MODELS[model]['name']}...")
+    logger.info(f"Starting encoding for student: {matricule} using {model}")
     
     # Load existing encodings
     known_encodings, known_names, _ = load_existing_encodings(model)
@@ -520,46 +615,49 @@ def encode_single_student(matricule, model='arcface'):
             
         image_path = os.path.join(person_dir, image_name)
         try:
-            # Load image with OpenCV
-            image = cv2.imread(image_path)
-            if image is None:
-                print(f"⚠️  Failed to load {image_name}")
+            # 🎨 Step 1: Preprocess image for better detection
+            preprocessed_image = preprocess_image(image_path)
+            if preprocessed_image is None:
+                print(f"⚠️  Failed to preprocess {image_name}")
                 continue
             
-            # Detect faces with RetinaFace and get ArcFace embeddings
-            faces = face_app.get(image)
+            # 🔄 Step 2: Create augmented versions for robustness
+            augmented_images = create_augmented_images(preprocessed_image)
+            print(f"   🎨 Created {len(augmented_images)} augmented versions of {image_name}")
             
-            # Check if faces is None or empty
-            if faces is None:
-                print(f"⚠️  No faces detected in {image_name} (returned None)")
-                continue
-            
-            if len(faces) == 0:
-                print(f"⚠️  No faces found in {image_name}")
-                continue
-            
-            # Process each detected face
-            for face in faces:
-                # Get embedding and normalize it
-                embedding = np.asarray(face.embedding, dtype=np.float32)
-                norm = np.linalg.norm(embedding)
-                if norm > 0:
-                    embedding = embedding / norm
+            # 🔍 Step 3: Detect and encode faces from all augmented versions
+            for aug_idx, aug_image in enumerate(augmented_images):
+                # Detect faces with RetinaFace and get ArcFace embeddings
+                faces = face_app.get(aug_image)
                 
-                known_encodings.append(embedding)
-                known_names.append(matricule)
-                student_faces += 1
+                # Check if faces is None or empty
+                if faces is None or len(faces) == 0:
+                    continue
                 
-            print(f"   ✅ {image_name}: {len(faces)} face(s) encoded")
+                # Process each detected face
+                for face in faces:
+                    # Get embedding and normalize it
+                    embedding = np.asarray(face.embedding, dtype=np.float32)
+                    norm = np.linalg.norm(embedding)
+                    if norm > 0:
+                        embedding = embedding / norm
+                    
+                    known_encodings.append(embedding)
+                    known_names.append(matricule)
+                    student_faces += 1
+                
+            print(f"   ✅ {image_name}: {student_faces} total face(s) encoded (with augmentation)")
             
         except Exception as e:
             print(f"   ❌ Error processing {image_name}: {e}")
     
     if student_faces == 0:
         print(f"❌ No faces encoded for {matricule}")
+        logger.warning(f"No faces encoded for student: {matricule}")
         return False
     
     print(f"   📊 {matricule}: {student_faces} total faces encoded")
+    logger.info(f"Successfully encoded {student_faces} faces for student: {matricule}")
     
     # Save updated encodings
     encodings_file = FACE_MODELS[model]['file']
@@ -580,7 +678,8 @@ def encode_single_student(matricule, model='arcface'):
     
     with open(encodings_file, 'wb') as f:
         pickle.dump(data, f)
-        
+    
+    logger.info(f"Encodings file saved: {encodings_file} - {len(known_encodings)} faces, {len(set(known_names))} students")
     print(f"✅ Encodings updated with {matricule} (Total: {len(known_encodings)} faces, {len(set(known_names))} students)")
     return True
 
@@ -589,9 +688,11 @@ def encode_faces_from_dataset(model='arcface'):
     """Encode faces from dataset directory structure using ArcFace (InsightFace)"""
     if model not in FACE_MODELS:
         print(f"❌ Invalid model: {model}. Use: {list(FACE_MODELS.keys())}")
+        logger.error(f"Invalid model specified: {model}")
         return False
     
     print(f"🔄 Starting face encoding from dataset using {FACE_MODELS[model]['name']}...")
+    logger.info(f"Starting full dataset encoding using {model}")
     
     # Create dataset directory if it doesn't exist
     os.makedirs(DATASET_DIR, exist_ok=True)

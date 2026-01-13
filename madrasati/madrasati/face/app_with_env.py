@@ -40,6 +40,7 @@ import multiprocessing as mp
 import shutil
 import signal
 import psutil  # For CPU monitoring
+import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from threading import Lock
@@ -51,6 +52,18 @@ from insightface.data import get_image as ins_get_image
 # Suppress pkg_resources deprecation warning
 import warnings
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
+
+# Configure logging
+LOG_FILE_APP = os.getenv('FACE_RECOGNITION_LOG_FILE', 'face_recognition_app.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE_APP, encoding='utf-8'),
+        logging.StreamHandler()  # Also print to console
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # 🎨 Real-ESRGAN imports for image enhancement
 try:
@@ -322,22 +335,15 @@ def initialize_encodings():
     global known_encodings, known_names
     
     print("🧠 INITIALIZING FACE ENCODINGS...")
+    logger.info("Starting face encodings initialization...")
     
     try:
         with open(ENCODINGS_FILE, "rb") as f:
             data = pickle.load(f)
             # ✅ Utiliser 'embeddings' (clé réelle dans le fichier pickle)
-            encodings = data.get("embeddings", [])
+            known_encodings = data.get("embeddings", [])
             known_names = data.get("names", [])
             
-            # Normalize all encodings
-            known_encodings = []
-            for enc in encodings:
-                emb = np.asarray(enc, dtype=np.float32)
-                norm = np.linalg.norm(emb)
-                if norm > 0:
-                    emb = emb / norm
-                known_encodings.append(emb)
             
         print(f"📊 ENCODING STATISTICS:")
         print(f"   - Total encodings loaded: {len(known_encodings)}")
@@ -356,19 +362,23 @@ def initialize_encodings():
         if not known_encodings:
             print("⚠️  Encodages non valides ou vides. Le système démarrera en mode attente.")
             print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages.")
+            logger.warning("No valid encodings found - starting in detection-only mode")
             known_encodings = []
             known_names = []
         else:
             print(f"✅ {len(known_encodings)} encodages chargés pour {len(set(known_names))} personnes.")
+            logger.info(f"Successfully loaded {len(known_encodings)} encodings for {len(set(known_names))} students")
 
     except FileNotFoundError:
         print("⚠️  Fichier encodings.pkl non trouvé. Le système démarrera en mode attente.")
         print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages automatiquement.")
+        logger.warning("Encodings file not found - starting in detection-only mode")
         known_encodings = []
         known_names = []
     except Exception as e:
         print(f"⚠️  Erreur lors du chargement des encodages: {e}")
         print("💡 Le système démarrera avec des encodages vides.")
+        logger.error(f"Error loading encodings: {e}")
         known_encodings = []
         known_names = []
 
@@ -408,6 +418,7 @@ def on_message(ws, message):
 
 def on_error(ws, error):
     print(f"❌ WebSocket error: {error}")
+    logger.error(f"WebSocket error: {error}")
     global ws_connected
     with ws_lock:
         ws_connected = False
@@ -421,6 +432,7 @@ def on_close(ws, close_status_code, close_msg):
 def on_open(ws):
     global ws_connected, ws_reconnect_attempts, ws_last_activity
     print("✅ WebSocket connected successfully")
+    logger.info("WebSocket connection established")
     with ws_lock:
         ws_connected = True
         ws_reconnect_attempts = 0
@@ -541,30 +553,27 @@ def check_websocket_connection():
         else:
             print(f"✅ WebSocket healthy (last activity: {time_since_last_activity:.0f}s ago)")
 
-def verify_student_exists(student_id):
-    """Verify if student exists in database before logging attendance"""
-    try:
-        response = requests.get(f"{BACKEND_URL}/api/students", timeout=5)
-        if response.status_code == 200:
-            students = response.json()
-            student_matricules = [str(student.get('matricule')) for student in students if student.get('matricule')]
-            return str(student_id) in student_matricules
-        else:
-            print(f"⚠️  Impossible de vérifier l'étudiant {student_id} (erreur {response.status_code})")
-            return True  # Continue anyway if API is down
-    except Exception as e:
-        print(f"⚠️  Erreur vérification étudiant {student_id}: {e}")
-        return True  # Continue anyway if connection fails
+# def verify_student_exists(student_id):
+#     """Verify if student exists in database before logging attendance"""
+#     try:
+#         response = requests.get(f"{BACKEND_URL}/api/students", timeout=5)
+#         if response.status_code == 200:
+#             students = response.json()
+#             student_matricules = [str(student.get('matricule')) for student in students if student.get('matricule')]
+#             return str(student_id) in student_matricules
+#         else:
+#             print(f"⚠️  Impossible de vérifier l'étudiant {student_id} (erreur {response.status_code})")
+#             return True  # Continue anyway if API is down
+#     except Exception as e:
+#         print(f"⚠️  Erreur vérification étudiant {student_id}: {e}")
+#         return True  # Continue anyway if connection fails
 
 def log_attendance(student_id, camera_type, confidence):
     """Enregistre la présence dans le fichier CSV et envoie au backend"""
     
     print(f"🎯 RECOGNITION DETECTED: Student {student_id} on {camera_type} camera (confidence: {confidence:.3f})")
+    logger.info(f"Attendance logged: Student={student_id}, Camera={camera_type}, Confidence={confidence:.3f}")
     
-    # Verify student exists in database first
-    if not verify_student_exists(student_id):
-        print(f"⚠️  Étudiant {student_id} non trouvé en base de données - présence ignorée")
-        return
     
     now = datetime.datetime.now()
     timestamp_csv = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -971,6 +980,7 @@ def process_frame(frame, camera_type, camera_name):
         print(f"🎯 SCRFD 2.5G DETECTION RESULTS for {camera_name}:")
         print(f"   - Total faces detected: {len(faces)}")
         print(f"   - After size filtering (>={MIN_FACE_SIZE}px): {len(face_locations)}")
+        logger.info(f"Face detection: {len(faces)} faces found, {len(face_locations)} after filtering (Camera: {camera_name})")
     
     except Exception as e:
         detection_time = (time.time() - detection_start) * 1000
@@ -1007,8 +1017,8 @@ def process_frame(frame, camera_type, camera_name):
         # Save ALL detected faces
         for i, face_location in enumerate(face_locations):
             det_score = face_det_scores[i] if i < len(face_det_scores) else 0.0
-            save_detected_face(frame, face_location, label="unknown", confidence=det_score)
-            save_unknown_face(frame, face_location, confidence=det_score)
+            # save_detected_face(frame, face_location, label="unknown", confidence=det_score)
+            # save_unknown_face(frame, face_location, confidence=det_score)
         
         total_time = (time.time() - frame_start_time) * 1000
         print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========\n")
@@ -1048,9 +1058,10 @@ def process_frame(frame, camera_type, camera_name):
             confidence = best_similarity
             
             print(f"     ✅ RECOGNIZED: {name} (confidence: {confidence:.3f})")
+            logger.info(f"Face recognized: Student={name}, Confidence={confidence:.3f}, Location={face_location}")
             
             # 💾 Save the recognized face
-            save_detected_face(frame, face_location, label=name, confidence=confidence)
+            # save_detected_face(frame, face_location, label=name, confidence=confidence)
             
             # ⏱️ Log attendance start
             log_start = time.time()
@@ -1066,11 +1077,12 @@ def process_frame(frame, camera_type, camera_name):
             # Add to unknown faces list
             unknown_face_locations.append(face_location)
             # 💾 Save individual detected face for reference
-            save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
+            # save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
     
     # If there are unknown faces, draw arrows and save the frame
     if unknown_face_locations:
         print(f"🔴 Found {len(unknown_face_locations)} unknown face(s) - drawing arrows and saving frame")
+        logger.warning(f"Unknown faces detected: {len(unknown_face_locations)} faces (Camera: {camera_name})")
         
         # Draw arrows above all unknown faces
         for face_location in unknown_face_locations:
@@ -1106,6 +1118,13 @@ def main():
     print(f"📹 Camera Name: {SINGLE_CAMERA_NAME}")
     print(f"📹 Camera Type: {SINGLE_CAMERA_TYPE}")
     print(f"🎯 Using SCRFD 2.5G detector for fast and accurate face detection!")
+    logger.info("=" * 50)
+    logger.info("Face Recognition System Starting")
+    logger.info(f"Camera: {SINGLE_CAMERA_NAME} ({SINGLE_CAMERA_TYPE})")
+    logger.info(f"URL: {SINGLE_CAMERA_URL}")
+    logger.info(f"Detection Model: SCRFD 2.5G")
+    logger.info(f"Enhancement Level: {ENHANCEMENT_LEVEL}")
+    logger.info("=" * 50)
     
     # Établir la connexion WebSocket
     connect_websocket()
@@ -1120,7 +1139,10 @@ def main():
     
     if not camera_data:
         print("❌ Impossible d'initialiser la caméra. Le programme va s'arrêter.")
+        logger.error("Failed to initialize camera - system shutdown")
         return
+    
+    logger.info(f"Camera initialized successfully: {camera_data['name']}")
     
     # Start listener thread for quit commands
     listener_thread = threading.Thread(target=listen_for_quit, daemon=True)
@@ -1146,10 +1168,10 @@ def main():
                 break
 
             # Periodic WebSocket health check (every 60 seconds)
-            websocket_check_counter += 1
-            if websocket_check_counter >= 600:  # 60 seconds * 10 iterations per second
-                check_websocket_connection()
-                websocket_check_counter = 0
+            # websocket_check_counter += 1
+            # if websocket_check_counter >= 600:  # 60 seconds * 10 iterations per second
+            #     check_websocket_connection()
+            #     websocket_check_counter = 0
             
             # Read frame from camera
             ret, frame = cap.read()
@@ -1161,6 +1183,7 @@ def main():
                 # Try to reconnect after 3 consecutive failures
                 if camera_failure_count >= 3:
                     print("🔄 Tentative de reconnexion de la caméra...")
+                    logger.warning(f"Camera connection lost - attempting reconnection (failures: {camera_failure_count})")
                     cap.release()
                     new_cap = reconnect_camera(camera_data, max_retries=5)
                     
@@ -1192,9 +1215,11 @@ def main():
             
     except KeyboardInterrupt:
         print("\n🛑 Arrêt par Ctrl+C")
+        logger.info("System shutdown requested (Ctrl+C)")
         shutdown_event.set()
     finally:
         # Nettoyer les ressources
+        logger.info("Cleaning up resources...")
         shutdown_event.set()
         
         if cap:
