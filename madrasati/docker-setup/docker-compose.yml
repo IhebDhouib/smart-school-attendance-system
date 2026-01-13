@@ -92,15 +92,17 @@ services:
       - ../madrasati/face:/app/madrasati/face
       # Mount docker-setup for unknown_faces_api
       - ./unknown_faces_api_fastapi.py:/app/docker-setup/unknown_faces_api_fastapi.py
-      # Persistent storage for encodings and unknown faces (use named volumes for data)
-      - face_encodings:/app/madrasati/face/encodings
+      # Persistent storage for unknown faces and logs (use named volumes for data)
+      # NOTE: encodings are now in the main bind mount above for consistency
+      # - face_encodings:/app/madrasati/face/encodings  # REMOVED - conflicts with bind mount
       - face_unknown:/app/madrasati/face/unknown_faces
       - face_logs:/app/madrasati/face/logs
       # Optional: Mount dataset if you want to manage it from host
-      # - ./dataset:/app/madrasati/face/dataset
+      - ./dataset:/app/madrasati/face/dataset
     ports:
       - "8088:8000"  # Face Encoding API
       - "5001:5001"  # Unknown Faces API
+      - "8501:8501"  # Streamlit Dataset Viewer
     depends_on:
       - backend
     networks:
