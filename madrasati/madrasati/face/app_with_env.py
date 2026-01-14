@@ -107,7 +107,7 @@ DET_THRESH = float(os.getenv("DET_THRESH", "0.3"))  # Detection confidence thres
 REC_THRESH = float(os.getenv("REC_THRESH", "0.3"))  # Recognition similarity threshold (lower = stricter)
 
 # 🎨 Image Enhancement
-ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "False").lower() == "true"  # Enable Real-ESRGAN super-resolution (VERY slow ~500ms)
+ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "True").lower() == "true"  # Enable Real-ESRGAN super-resolution (VERY slow ~500ms)
 ESRGAN_MODEL_PATH = os.getenv("ESRGAN_MODEL_PATH", "RealESRGAN_x2plus.pth")  # Model file path
 ESRGAN_SCALE = int(os.getenv("ESRGAN_SCALE", "2"))  # Upscaling factor (2x or 4x)
 
@@ -752,9 +752,31 @@ def enhance_image_for_face_detection(frame):
     # Try ESRGAN enhancement first if enabled (VERY SLOW)
     if esrgan_enabled and esrgan_upsampler is not None:
         try:
-            # Apply Real-ESRGAN super-resolution
-            enhanced_frame, _ = esrgan_upsampler.enhance(frame, outscale=ESRGAN_SCALE)
+            # ✅ Step 1: Apply bilateral filter for denoising before ESRGAN
+            # This removes noise while preserving edges, giving ESRGAN cleaner input
+            denoised_frame = cv2.bilateralFilter(frame, 5, 50, 50)
+            print(f"   🧹 Bilateral denoising applied before ESRGAN")
+            
+            # ✅ Step 2: Optional CLAHE for better contrast before upscaling
+            lab = cv2.cvtColor(denoised_frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            l = clahe.apply(l)
+            preprocessed = cv2.merge([l, a, b])
+            preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_LAB2BGR)
+            print(f"   📊 CLAHE preprocessing applied before ESRGAN")
+            
+            # ✅ Step 3: Apply Real-ESRGAN super-resolution on preprocessed image
+            enhanced_frame, _ = esrgan_upsampler.enhance(preprocessed, outscale=ESRGAN_SCALE)
             print(f"   🎨 ESRGAN enhancement applied ({ESRGAN_SCALE}x upscaling)")
+            
+            # ✅ Step 4: Optional sharpening after ESRGAN for crisp details
+            kernel = np.array([[-0.5, -0.5, -0.5],
+                               [-0.5,  5.0, -0.5],
+                               [-0.5, -0.5, -0.5]])
+            enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+            print(f"   ✨ Post-ESRGAN sharpening applied")
+            
             return enhanced_frame
         except Exception as e:
             print(f"   ⚠️  ESRGAN failed: {e}, falling back to {ENHANCEMENT_LEVEL}")

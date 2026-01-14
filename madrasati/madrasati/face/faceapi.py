@@ -14,7 +14,7 @@ import io
 from insightface.app import FaceAnalysis
 
 # Configure logging
-LOG_FILE = os.getenv('FACE_API_LOG_FILE', 'logs/face_api_logs.log')
+LOG_FILE = os.getenv('FACE_API_LOG_FILE', 'faceapilogs.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -135,19 +135,64 @@ def preprocess_image(image_path):
         return None
 
 def create_augmented_images(image_array):
-    """Crée des variations de l'image pour améliorer la robustesse"""
+    """Crée des variations de l'image pour améliorer la robustesse
+    
+    ✅ CAMERA QUALITY MATCHING:
+    This function now includes low-quality augmentations to match security camera conditions:
+    - JPEG compression (simulates camera compression)
+    - Motion blur (simulates camera movement)
+    - Downscaling (simulates distant faces)
+    - Gaussian noise (simulates sensor noise)
+    
+    This ensures that high-quality dataset encodings can better match low-quality camera frames.
+    """
     augmented = [image_array]
     h, w = image_array.shape[:2]
     center = (w // 2, h // 2)
     
+    logger.info(f"   📸 Creating augmented images for camera quality matching...")
+    
+    # Existing rotations
     for angle in [5, -5, 10, -10]:
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
         rotated = cv2.warpAffine(image_array, matrix, (w, h))
         augmented.append(rotated)
     
+    # Existing brightness variations
     bright = cv2.convertScaleAbs(image_array, alpha=1.1, beta=10)
     dark = cv2.convertScaleAbs(image_array, alpha=0.9, beta=-10)
     augmented.extend([bright, dark])
+    
+    # ✅ CAMERA QUALITY SIMULATION: Low-quality versions to match camera conditions
+    logger.info(f"   📉 Adding low-quality augmentations (compression, blur, noise, distance)...")
+    
+    # Simulate camera compression
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 50]  # Low JPEG quality
+    _, compressed = cv2.imencode('.jpg', image_array, encode_param)
+    compressed_img = cv2.imdecode(compressed, cv2.IMREAD_COLOR)
+    augmented.append(compressed_img)
+    
+    # Simulate motion blur
+    kernel_size = 5
+    kernel_motion_blur = np.zeros((kernel_size, kernel_size))
+    kernel_motion_blur[int((kernel_size-1)/2), :] = np.ones(kernel_size)
+    kernel_motion_blur = kernel_motion_blur / kernel_size
+    blurred = cv2.filter2D(image_array, -1, kernel_motion_blur)
+    augmented.append(blurred)
+    
+    # Simulate distance (downscale then upscale)
+    small = cv2.resize(image_array, (w//2, h//2))
+    distant = cv2.resize(small, (w, h))
+    augmented.append(distant)
+    
+    # Add Gaussian noise
+    noise = np.random.normal(0, 10, image_array.shape).astype(np.uint8)
+    noisy = cv2.add(image_array, noise)
+    augmented.append(noisy)
+    
+    logger.info(f"   ✅ Created {len(augmented)} augmented images (including {len(augmented)-7} low-quality variants)")
+    
+    return augmented
     
     return augmented
 
@@ -723,38 +768,39 @@ def encode_faces_from_dataset(model='arcface'):
                 
             image_path = os.path.join(person_dir, image_name)
             try:
-                # Load image with OpenCV (InsightFace uses BGR format)
-                image = cv2.imread(image_path)
-                if image is None:
-                    print(f"⚠️  Failed to load {image_name}")
+                # 🎨 Step 1: Preprocess image for better detection
+                preprocessed_image = preprocess_image(image_path)
+                if preprocessed_image is None:
+                    print(f"⚠️  Failed to preprocess {image_name}")
                     continue
                 
-                # Detect faces with RetinaFace and get ArcFace embeddings
-                faces = face_app.get(image)
+                # 🔄 Step 2: Create augmented versions for robustness (camera quality matching)
+                augmented_images = create_augmented_images(preprocessed_image)
+                print(f"   🎨 Created {len(augmented_images)} augmented versions of {image_name}")
                 
-                # Check if faces is None or empty
-                if faces is None:
-                    print(f"⚠️  No faces detected in {image_name} using RetinaFace (returned None)")
-                    continue
-                
-                if len(faces) == 0:
-                    print(f"⚠️  No faces found in {image_name} using RetinaFace")
-                    continue
-                
-                # Process each detected face
-                for face in faces:
-                    # Get embedding and normalize it (L2 normalization)
-                    embedding = np.asarray(face.embedding, dtype=np.float32)
-                    norm = np.linalg.norm(embedding)
-                    if norm > 0:
-                        embedding = embedding / norm
+                # 🔍 Step 3: Detect and encode faces from all augmented versions
+                for aug_idx, aug_image in enumerate(augmented_images):
+                    # Detect faces with RetinaFace and get ArcFace embeddings
+                    faces = face_app.get(aug_image)
                     
-                    known_encodings.append(embedding)
-                    known_names.append(person_name)
-                    total_faces_encoded += 1
-                    student_faces += 1
+                    # Check if faces is None or empty
+                    if faces is None or len(faces) == 0:
+                        continue
                     
-                print(f"   ✅ {image_name}: {len(faces)} face(s) encoded with {FACE_MODELS[model]['name']}")
+                    # Process each detected face
+                    for face in faces:
+                        # Get embedding and normalize it (L2 normalization)
+                        embedding = np.asarray(face.embedding, dtype=np.float32)
+                        norm = np.linalg.norm(embedding)
+                        if norm > 0:
+                            embedding = embedding / norm
+                        
+                        known_encodings.append(embedding)
+                        known_names.append(person_name)
+                        total_faces_encoded += 1
+                        student_faces += 1
+                    
+                print(f"   ✅ {image_name}: {student_faces} face(s) encoded with augmentation")
                 
             except Exception as e:
                 print(f"   ❌ Error processing {image_name} with {FACE_MODELS[model]['name']}: {e}")
