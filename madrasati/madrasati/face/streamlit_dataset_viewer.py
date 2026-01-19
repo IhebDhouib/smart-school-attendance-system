@@ -39,13 +39,11 @@ def load_encodings():
             data = pickle.load(f)
             embeddings = data.get("embeddings", [])
             names = data.get("names", [])
-            return embeddings, names
+            return embeddings, names, None
     except FileNotFoundError:
-        st.error(f"❌ Encodings file not found: {ENCODINGS_FILE}")
-        return [], []
+        return [], [], f"Encodings file not found: {ENCODINGS_FILE}"
     except Exception as e:
-        st.error(f"❌ Error loading encodings: {e}")
-        return [], []
+        return [], [], f"Error loading encodings: {e}"
 
 def save_encodings(embeddings, names):
     """Save encodings to pickle file"""
@@ -65,12 +63,30 @@ def save_encodings(embeddings, names):
         st.error(f"❌ Error saving encodings: {e}")
         return False
 
+@st.cache_data(ttl=300)
+def compress_image(img_path, max_size=(400, 400), quality=85):
+    """Compress and resize image for web display"""
+    try:
+        with Image.open(img_path) as img:
+            # Convert RGBA to RGB if needed
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                img = background
+            
+            # Resize maintaining aspect ratio
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            return img.copy()
+    except Exception as e:
+        return None
+
 def get_dataset_images():
     """Get all images from dataset directory"""
     images_dict = {}
     
     if not os.path.exists(DATASET_DIR):
-        st.warning(f"⚠️  Dataset directory not found: {DATASET_DIR}")
         return images_dict
     
     # Iterate through student folders
@@ -143,7 +159,10 @@ def delete_student_folder(student_id):
 def delete_student_encodings(student_id):
     """Delete all encodings for a student"""
     try:
-        embeddings, names = load_encodings()
+        embeddings, names, error = load_encodings()
+        if error:
+            st.error(f"❌ {error}")
+            return False
         
         # Filter out the student's encodings
         new_embeddings = [emb for emb, name in zip(embeddings, names) if name != student_id]
@@ -168,7 +187,7 @@ def encode_student_images(student_id):
         response = requests.post(
             f"{FACE_API_URL}/students/encodings",
             json={"student_id": student_id},
-            timeout=30
+            timeout=120
         )
         
         if response.status_code == 200:
@@ -190,7 +209,7 @@ def encode_all_students():
     try:
         response = requests.post(
             f"{FACE_API_URL}/students/encodings/rebuild",
-            timeout=120
+            timeout=6000
         )
         
         if response.status_code == 200:
@@ -231,6 +250,61 @@ def parse_log_line(line):
     except:
         return {'timestamp': '', 'level': 'UNKNOWN', 'message': line.strip()}
 
+def extract_recognition_info(message):
+    """Extract key info from recognition log messages"""
+    info = {
+        'type': 'other',
+        'student': None,
+        'confidence': None,
+        'details': message
+    }
+    
+    # Recognition events
+    if 'Face recognized:' in message or 'RECOGNIZED:' in message:
+        info['type'] = 'recognition'
+        # Extract student ID
+        if 'Student=' in message:
+            parts = message.split('Student=')
+            if len(parts) > 1:
+                info['student'] = parts[1].split(',')[0].split()[0].strip()
+        # Extract confidence
+        if 'Confidence=' in message or 'confidence:' in message:
+            import re
+            conf_match = re.search(r'[Cc]onfidence[=:]\s*([\d.]+)', message)
+            if conf_match:
+                info['confidence'] = float(conf_match.group(1))
+    
+    # Attendance logged
+    elif 'Attendance logged:' in message:
+        info['type'] = 'attendance'
+        if 'Student=' in message:
+            parts = message.split('Student=')
+            if len(parts) > 1:
+                info['student'] = parts[1].split(',')[0].strip()
+    
+    # Face detection
+    elif 'Face detection:' in message or 'faces found' in message:
+        info['type'] = 'detection'
+        import re
+        face_match = re.search(r'(\d+)\s+faces?\s+found', message)
+        if face_match:
+            info['details'] = f"{face_match.group(1)} faces detected"
+    
+    # Unknown faces
+    elif 'Unknown faces detected:' in message or 'unknown face' in message.lower():
+        info['type'] = 'unknown'
+        import re
+        face_match = re.search(r'(\d+)\s+faces?', message)
+        if face_match:
+            info['details'] = f"{face_match.group(1)} unknown faces"
+    
+    # System events
+    elif 'System' in message or 'Starting' in message or 'initialized' in message:
+        info['type'] = 'system'
+        info['details'] = message[:80] + '...' if len(message) > 80 else message
+    
+    return info
+
 def read_attendance_csv(csv_path, num_lines=100):
     """Read attendance CSV file"""
     try:
@@ -263,8 +337,13 @@ def main():
     st.sidebar.title("📊 Statistics")
     
     # Load data
-    embeddings, names = load_encodings()
+    embeddings, names, error = load_encodings()
+    if error:
+        st.error(f"❌ {error}")
+    
     dataset_images = get_dataset_images()
+    if not dataset_images and not os.path.exists(DATASET_DIR):
+        st.warning(f"⚠️ Dataset directory not found: {DATASET_DIR}")
     
     # Display statistics
     st.sidebar.metric("Total Encodings", len(embeddings))
@@ -341,16 +420,18 @@ def main():
                     for idx, img_path in enumerate(images):
                         with cols[idx % 4]:
                             try:
-                                # Load image and close file handle immediately
-                                with Image.open(img_path) as img:
-                                    img_copy = img.copy()  # Create a copy to close the file
+                                # Load and compress image for faster display
+                                compressed_img = compress_image(img_path)
+                                
+                                if compressed_img:
+                                    st.image(compressed_img, caption=os.path.basename(img_path), use_column_width=True)
+                                else:
+                                    st.error(f"Failed to load {os.path.basename(img_path)}")
                 
-                                    st.image(img_copy, caption=os.path.basename(img_path), use_container_width=True)
-                
-                                    # Delete button for individual image
-                                    if st.button(f"🗑️ Delete", key=f"delete_{img_path}"):
-                                        if delete_image(img_path):
-                                            st.rerun()
+                                # Delete button for individual image
+                                if st.button(f"🗑️ Delete", key=f"delete_{img_path}"):
+                                    if delete_image(img_path):
+                                        st.rerun()
                             except Exception as e:
                                 st.error(f"Error loading {img_path}: {e}")
     
@@ -580,7 +661,7 @@ def main():
             st.subheader("👁️ Face Recognition App Logs")
             
             # Filters
-            col_f1, col_f2 = st.columns([1, 3])
+            col_f1, col_f2, col_f3 = st.columns([1, 2, 2])
             with col_f1:
                 level_filter = st.selectbox(
                     "Filter by Level",
@@ -588,7 +669,13 @@ def main():
                     key="app_level_filter"
                 )
             with col_f2:
-                search_query = st.text_input("🔍 Search logs", "", key="app_search")
+                event_type = st.selectbox(
+                    "Event Type",
+                    ["All", "Recognition", "Detection", "Attendance", "Unknown Faces", "System"],
+                    key="app_event_filter"
+                )
+            with col_f3:
+                search_query = st.text_input("🔍 Search", "", key="app_search")
             
             # Read and display logs
             logs = read_log_file(FACE_RECOGNITION_LOG, num_lines)
@@ -598,21 +685,67 @@ def main():
                 logs = filter_logs_by_level(logs, level_filter)
                 logs = filter_logs_by_search(logs, search_query)
                 
-                st.info(f"📊 Showing {len(logs)} log entries")
-                
-                # Display logs with color coding
-                for log_line in reversed(logs):  # Show newest first
+                # Parse and extract info
+                log_data = []
+                for log_line in reversed(logs):  # Process newest first
                     parsed = parse_log_line(log_line)
-                    level = parsed['level']
+                    info = extract_recognition_info(parsed['message'])
                     
-                    if 'ERROR' in level:
-                        st.error(f"**{parsed['timestamp']}** | {parsed['message']}")
-                    elif 'WARNING' in level:
-                        st.warning(f"**{parsed['timestamp']}** | {parsed['message']}")
-                    elif 'INFO' in level:
-                        st.info(f"**{parsed['timestamp']}** | {parsed['message']}")
-                    else:
-                        st.text(log_line.strip())
+                    # Filter by event type
+                    if event_type != "All":
+                        if event_type == "Recognition" and info['type'] != 'recognition':
+                            continue
+                        elif event_type == "Detection" and info['type'] != 'detection':
+                            continue
+                        elif event_type == "Attendance" and info['type'] != 'attendance':
+                            continue
+                        elif event_type == "Unknown Faces" and info['type'] != 'unknown':
+                            continue
+                        elif event_type == "System" and info['type'] != 'system':
+                            continue
+                    
+                    log_data.append({
+                        'Time': parsed['timestamp'].split()[1] if parsed['timestamp'] else '',  # Just time, no date
+                        'Type': info['type'].title(),
+                        'Student': info['student'] or '-',
+                        'Confidence': f"{info['confidence']:.3f}" if info['confidence'] else '-',
+                        'Details': info['details'][:60] + '...' if len(info['details']) > 60 else info['details']
+                    })
+                
+                st.info(f"📊 Showing {len(log_data)} events")
+                
+                # Display as table
+                if log_data:
+                    df_logs = pd.DataFrame(log_data)
+                    
+                    # Color code by type
+                    def highlight_type(row):
+                        if row['Type'] == 'Recognition':
+                            return ['background-color: #d4edda'] * len(row)
+                        elif row['Type'] == 'Unknown':
+                            return ['background-color: #fff3cd'] * len(row)
+                        elif row['Type'] == 'Attendance':
+                            return ['background-color: #d1ecf1'] * len(row)
+                        else:
+                            return [''] * len(row)
+                    
+                    st.dataframe(df_logs, use_container_width=True, height=600)
+                    
+                    # Quick stats
+                    st.markdown("---")
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    recognition_count = sum(1 for d in log_data if d['Type'] == 'Recognition')
+                    unknown_count = sum(1 for d in log_data if d['Type'] == 'Unknown')
+                    attendance_count = sum(1 for d in log_data if d['Type'] == 'Attendance')
+                    detection_count = sum(1 for d in log_data if d['Type'] == 'Detection')
+                    
+                    col1.metric("✅ Recognitions", recognition_count)
+                    col2.metric("❓ Unknown", unknown_count)
+                    col3.metric("📝 Attendance", attendance_count)
+                    col4.metric("🔍 Detections", detection_count)
+                else:
+                    st.warning("No events match the current filters")
             else:
                 st.warning(f"⚠️  No logs found in {FACE_RECOGNITION_LOG}")
         

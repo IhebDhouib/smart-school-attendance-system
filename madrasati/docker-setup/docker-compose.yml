@@ -80,8 +80,8 @@ services:
       INSIGHTFACE_MODEL: buffalo_l
       USE_GPU: "False"
       DET_SIZE: 640
-      DET_THRESH: 0.5
-      REC_THRESH: 0.45
+      DET_THRESH: 0.3
+      REC_THRESH: 0.3
       # Paths
       DATASET_DIR: /app/madrasati/face/dataset
       ENCODINGS_FILE_ARCFACE: /app/madrasati/face/encodings_arcface.pkl
@@ -97,8 +97,8 @@ services:
       # - face_encodings:/app/madrasati/face/encodings  # REMOVED - conflicts with bind mount
       - face_unknown:/app/madrasati/face/unknown_faces
       - face_logs:/app/madrasati/face/logs
-      # Optional: Mount dataset if you want to manage it from host
-      - ./dataset:/app/madrasati/face/dataset
+      # Mount dataset from parent face directory (where actual images are)
+      - ../madrasati/face/dataset:/app/madrasati/face/dataset
     ports:
       - "8088:8000"  # Face Encoding API
       - "5001:5001"  # Unknown Faces API

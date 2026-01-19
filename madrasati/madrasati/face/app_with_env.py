@@ -41,6 +41,7 @@ import shutil
 import signal
 import psutil  # For CPU monitoring
 import logging
+import queue  # For frame queue
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from threading import Lock
@@ -148,6 +149,12 @@ perf_total_io_time = 0
 perf_faces_detected = 0
 perf_faces_recognized = 0
 perf_start_time = time.time()
+
+# 🎬 Frame Queue Configuration
+FRAME_QUEUE_MAX_SIZE = 1000  # Maximum frames in queue to prevent memory overflow
+FRAME_CAPTURE_INTERVAL = 0.5  # Capture a frame every 0.5 seconds
+frame_queue = queue.Queue(maxsize=FRAME_QUEUE_MAX_SIZE)
+last_queued_frame = {}  # Store last queued frame per camera for scene change detection
 
 # 🔍 Scene Change Detection Settings
 SCENE_CHANGE_THRESHOLD = 2.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
@@ -658,6 +665,114 @@ def save_detected_face(frame, face_location, label="detected", confidence=0.0):
         print(f"❌ Erreur sauvegarde face détectée: {e}")
         return None
 
+def has_scene_changed(current_frame, previous_frame, camera_name):
+    """Check if scene has changed significantly between frames"""
+    if previous_frame is None:
+        return True
+    
+    try:
+        # Convert both frames to grayscale for comparison
+        gray_current = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
+        gray_previous = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)
+        
+        # Calculate absolute difference
+        frame_diff = cv2.absdiff(gray_previous, gray_current)
+        
+        # Apply threshold
+        _, thresh = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
+        
+        # Calculate percentage of changed pixels
+        changed_pixels = np.sum(thresh > 0)
+        total_pixels = thresh.size
+        change_percentage = (changed_pixels / total_pixels) * 100
+        
+        # Return True if change is above threshold
+        if change_percentage >= SCENE_CHANGE_PIXEL_THRESHOLD:
+            print(f"🔄 Scene change detected: {change_percentage:.2f}% change - adding to queue")
+            return True
+        else:
+            # Skip frame - no significant change
+            return False
+            
+    except Exception as e:
+        print(f"⚠️  Error in scene change detection: {e}")
+        return True  # Process frame if error occurs
+
+def frame_capture_thread(camera_data):
+    """Producer thread - captures frames and adds to queue every 0.5 seconds"""
+    global last_queued_frame
+    
+    camera_name = camera_data['name']
+    camera_type = camera_data['type']
+    cap = camera_data['cap']
+    
+    print(f"🎬 Frame capture thread started for {camera_name}")
+    logger.info(f"Frame capture thread started: {camera_name}")
+    
+    camera_failure_count = 0
+    MAX_FAILURES = 5
+    
+    while not shutdown_event.is_set():
+        try:
+            capture_start = time.time()
+            
+            # Read frame from camera
+            ret, frame = cap.read()
+            
+            if not ret:
+                camera_failure_count += 1
+                print(f"❌ Frame capture failed for {camera_name} (failure {camera_failure_count}/{MAX_FAILURES})")
+                
+                if camera_failure_count >= MAX_FAILURES:
+                    print(f"❌ Too many failures - stopping capture thread for {camera_name}")
+                    logger.error(f"Camera capture failed: {camera_name}")
+                    break
+                
+                time.sleep(1)
+                continue
+            
+            # Reset failure counter on success
+            camera_failure_count = 0
+            
+            # Check for scene change before queuing
+            previous_frame = last_queued_frame.get(camera_name)
+            if has_scene_changed(frame, previous_frame, camera_name):
+                # Try to add frame to queue (non-blocking)
+                try:
+                    frame_data = {
+                        'frame': frame.copy(),
+                        'camera_name': camera_name,
+                        'camera_type': camera_type,
+                        'timestamp': datetime.datetime.now()
+                    }
+                    
+                    frame_queue.put_nowait(frame_data)
+                    last_queued_frame[camera_name] = frame.copy()
+                    
+                    queue_size = frame_queue.qsize()
+                    print(f"📥 Frame added to queue | Queue size: {queue_size}/{FRAME_QUEUE_MAX_SIZE}")
+                    
+                    if queue_size > FRAME_QUEUE_MAX_SIZE * 0.8:
+                        print(f"⚠️  Queue filling up: {queue_size}/{FRAME_QUEUE_MAX_SIZE} frames")
+                        logger.warning(f"Frame queue filling up: {queue_size} frames")
+                    
+                except queue.Full:
+                    print(f"⚠️  Queue full ({FRAME_QUEUE_MAX_SIZE}) - dropping frame (system overloaded)")
+                    logger.warning(f"Frame queue full - dropping frame")
+            
+            # Wait for next capture interval
+            elapsed = time.time() - capture_start
+            sleep_time = max(0, FRAME_CAPTURE_INTERVAL - elapsed)
+            time.sleep(sleep_time)
+            
+        except Exception as e:
+            print(f"❌ Error in frame capture thread: {e}")
+            logger.error(f"Frame capture error: {e}")
+            time.sleep(1)
+    
+    print(f"🛑 Frame capture thread stopped for {camera_name}")
+    logger.info(f"Frame capture thread stopped: {camera_name}")
+
 def listen_for_quit():
     """Écoute les commandes clavier pour quitter"""
     while not shutdown_event.is_set():
@@ -891,8 +1006,9 @@ def process_frame(frame, camera_type, camera_name):
     """
     Process frame for face recognition using SCRFD detector
     Optimized for security cameras with far face detection
+    Now called from queue consumer - scene change detection done before queuing
     """
-    global known_encodings, known_names, frame_count, previous_frames
+    global known_encodings, known_names, frame_count
     
     frame_start_time = time.time()
     results = []
@@ -901,43 +1017,8 @@ def process_frame(frame, camera_type, camera_name):
     # Get original frame dimensions
     height, width = frame.shape[:2]
     
-    # ⏱️ Scene change detection (intelligent frame skipping)
-    if ENABLE_INTELLIGENT_FRAME_SKIPPING and camera_name in previous_frames:
-        scene_change_start = time.time()
-        
-        # Convert both frames to grayscale for comparison
-        gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray_previous = cv2.cvtColor(previous_frames[camera_name], cv2.COLOR_BGR2GRAY)
-        
-        # Calculate absolute difference
-        frame_diff = cv2.absdiff(gray_previous, gray_current)
-        
-        # Apply threshold
-        _, thresh = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
-        
-        # Calculate percentage of changed pixels
-        changed_pixels = np.sum(thresh > 0)
-        total_pixels = thresh.size
-        change_percentage = (changed_pixels / total_pixels) * 100
-        
-        scene_change_time = (time.time() - scene_change_start) * 1000
-        
-        # Skip frame if change is below threshold
-        if change_percentage < SCENE_CHANGE_PIXEL_THRESHOLD:
-            # 🔇 No logs for skipped frames
-            return results
-        else:
-            # 🔄 Movement detected - processing frame
-            # ⏱️ Start timing - Frame enters processing
-            
-            print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
-            print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-            
-            print(f"🔄 Movement detected ({change_percentage:.2f}% change) - Processing frame")
-            pass
-    
-    # Store current frame for next comparison
-    previous_frames[camera_name] = frame.copy()
+    print(f"\n⏱️  ========== FRAME {frame_count} START ==========")
+    print(f"⏱️  Frame processing started: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
 
     # ⏱️ Enhancement start
     enhancement_start = time.time()
@@ -1170,70 +1251,80 @@ def main():
     listener_thread = threading.Thread(target=listen_for_quit, daemon=True)
     listener_thread.start()
     
-    print(f"🎥 Démarrage de la reconnaissance faciale...")
+    # Start frame capture thread (producer)
+    capture_thread = threading.Thread(
+        target=frame_capture_thread,
+        args=(camera_data,),
+        daemon=True,
+        name="FrameCapture"
+    )
+    capture_thread.start()
+    logger.info("Frame capture thread started")
+    
+    print(f"🎥 Démarrage de la reconnaissance faciale avec système de queue...")
+    print(f"📊 Configuration queue:")
+    print(f"   - Taille max: {FRAME_QUEUE_MAX_SIZE} frames")
+    print(f"   - Intervalle capture: {FRAME_CAPTURE_INTERVAL}s")
+    print(f"   - Détection changement scène: activée")
     print("💡 Tapez 'q' ou 'quit' pour arrêter le programme")
     
-    cap = camera_data['cap']
     camera_name = camera_data['name']
     camera_type = camera_data['type']
     
-    frame_skip_counter = 0
-    websocket_check_counter = 0
-    camera_failure_count = 0  # Track consecutive failures
-    MAX_CAMERA_FAILURES = 10  # Restart container after 10 failures
+    frames_processed = 0
+    frames_skipped = 0
 
     try:
+        # Consumer loop - process frames from queue
         while not shutdown_event.is_set():
-            # Check for shutdown signal frequently
-            if shutdown_event.is_set():
-                print("🔄 Signal d'arrêt détecté, arrêt du traitement...")
-                break
-
-            # Periodic WebSocket health check (every 60 seconds)
-            # websocket_check_counter += 1
-            # if websocket_check_counter >= 600:  # 60 seconds * 10 iterations per second
-            #     check_websocket_connection()
-            #     websocket_check_counter = 0
-            
-            # Read frame from camera
-            ret, frame = cap.read()
-            
-            if not ret:
-                camera_failure_count += 1
-                print(f"❌ Erreur lecture caméra {camera_name} (échec {camera_failure_count}/{MAX_CAMERA_FAILURES})")
+            try:
+                # Get frame from queue (with timeout to check shutdown periodically)
+                try:
+                    frame_data = frame_queue.get(timeout=1.0)
+                except queue.Empty:
+                    # No frames in queue - waiting for producer
+                    if frame_queue.qsize() == 0 and frames_processed > 0:
+                        print("⏳ Queue empty - waiting for frames...")
+                    continue
                 
-                # Try to reconnect after 3 consecutive failures
-                if camera_failure_count >= 3:
-                    print("🔄 Tentative de reconnexion de la caméra...")
-                    logger.warning(f"Camera connection lost - attempting reconnection (failures: {camera_failure_count})")
-                    cap.release()
-                    new_cap = reconnect_camera(camera_data, max_retries=5)
-                    
-                    if new_cap:
-                        cap = new_cap
-                        camera_failure_count = 0  # Reset failure counter
-                        print("✅ Caméra reconnectée avec succès - reprise du traitement")
-                    elif camera_failure_count >= MAX_CAMERA_FAILURES:
-                        print("❌ Nombre maximum d'échecs atteint - arrêt pour redémarrage du conteneur")
-                        shutdown_event.set()
-                        sys.exit(1)  # Exit with error code to trigger container restart
+                # Extract frame data
+                frame = frame_data['frame']
+                cam_name = frame_data['camera_name']
+                cam_type = frame_data['camera_type']
+                frame_timestamp = frame_data['timestamp']
                 
-                time.sleep(1)
+                queue_size = frame_queue.qsize()
+                processing_delay = (datetime.datetime.now() - frame_timestamp).total_seconds()
+                
+                print(f"\n📤 Processing frame from queue | Queue: {queue_size} | Delay: {processing_delay:.2f}s")
+                
+                if processing_delay > 5.0:
+                    print(f"⚠️  High processing delay: {processing_delay:.1f}s - consider optimizing")
+                    logger.warning(f"High processing delay: {processing_delay:.1f}s")
+                
+                # Process the frame
+                process_frame(frame, cam_type, cam_name)
+                frames_processed += 1
+                
+                # Mark task as done
+                frame_queue.task_done()
+                
+                # Periodic stats
+                if frames_processed % 10 == 0:
+                    print(f"\n📊 Processing Stats:")
+                    print(f"   - Frames processed: {frames_processed}")
+                    print(f"   - Queue size: {queue_size}/{FRAME_QUEUE_MAX_SIZE}")
+                    print(f"   - Average delay: {processing_delay:.2f}s\n")
+                
+            except Exception as e:
+                print(f"❌ Error processing frame from queue: {e}")
+                logger.error(f"Frame processing error: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
             
-            # Reset failure counter on successful frame read
-            camera_failure_count = 0
-            
-            # Increment frame skip counter
-            frame_skip_counter += 1
-            
-            # Only process frames every Nth iteration
-            if frame_skip_counter % FRAME_SKIP_INTERVAL == 0:
-                process_frame(frame, camera_type, camera_name)
-            
-            time.sleep(0.01)  # Small sleep to reduce CPU usage
-            
         print("✅ Boucle principale terminée")
+        print(f"📊 Total frames processed: {frames_processed}")
             
     except KeyboardInterrupt:
         print("\n🛑 Arrêt par Ctrl+C")
@@ -1244,14 +1335,23 @@ def main():
         logger.info("Cleaning up resources...")
         shutdown_event.set()
         
-        if cap:
-            cap.release()
+        # Wait for queue to be processed
+        print(f"⏳ Waiting for queue to finish ({frame_queue.qsize()} frames remaining)...")
+        try:
+            frame_queue.join()  # Wait for all tasks to complete
+            print("✅ Queue processed successfully")
+        except Exception as e:
+            print(f"⚠️  Error waiting for queue: {e}")
+        
+        if camera_data and camera_data.get('cap'):
+            camera_data['cap'].release()
         
         cv2.destroyAllWindows()
         if ws:
             ws.close()
         
         print("🧹 Ressources nettoyées")
+        print(f"📊 Final stats: {frames_processed} frames processed")
 
 if __name__ == "__main__":
     main()

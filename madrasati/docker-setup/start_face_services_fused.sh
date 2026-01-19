@@ -7,6 +7,14 @@
 
 set -e
 
+# Check for disable flag
+if [ -f "/app/.disable_services" ]; then
+    echo "⚠️  Services disabled via /app/.disable_services flag"
+    echo "To re-enable: docker exec face-fused rm /app/.disable_services && docker restart face-fused"
+    sleep infinity
+    exit 0
+fi
+
 echo "🚀 Starting Madrasati Face Services (Fused Container)"
 echo "=================================================="
 

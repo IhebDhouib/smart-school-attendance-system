@@ -1,3 +1,29 @@
+"""
+Single Camera Face Recognition System with SCRFD 2.5G Detector
+
+PERFORMANCE OPTIMIZATION:
+- Set ENHANCEMENT_LEVEL to control speed vs quality trade-off:
+  * "none"     - No enhancement (~0ms)     - Fastest, lowest quality
+  * "fast"     - CLAHE only (~10-20ms)     - ⭐ RECOMMENDED for real-time
+  * "balanced" - CLAHE + sharpen (~50-100ms) - Good balance
+  * "quality"  - Full pipeline (~500-700ms) - Best quality, very slow
+
+USAGE:
+  # For real-time (recommended):
+  ENHANCEMENT_LEVEL=fast python app_with_env_single_camera_scrfd.py
+  
+  # For maximum quality (slow):
+  ENHANCEMENT_LEVEL=quality python app_with_env_single_camera_scrfd.py
+  
+  # No enhancement (fastest):
+  ENHANCEMENT_LEVEL=none python app_with_env_single_camera_scrfd.py
+
+EXPECTED TIMING (per frame):
+  Enhancement: 10-20ms (fast) | 50-100ms (balanced) | 500-700ms (quality)
+  Detection:   50-100ms (SCRFD 2.5G is fast and accurate!)
+  Total:       ~60-120ms per frame with "fast" level = 8-16 FPS
+"""
+
 import cv2
 import numpy as np
 import os
@@ -14,6 +40,7 @@ import multiprocessing as mp
 import shutil
 import signal
 import psutil  # For CPU monitoring
+import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from threading import Lock
@@ -25,6 +52,18 @@ from insightface.data import get_image as ins_get_image
 # Suppress pkg_resources deprecation warning
 import warnings
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
+
+# Configure logging
+LOG_FILE_APP = os.getenv('FACE_RECOGNITION_LOG_FILE', 'face_recognition_app.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE_APP, encoding='utf-8'),
+        logging.StreamHandler()  # Also print to console
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # 🎨 Real-ESRGAN imports for image enhancement
 try:
@@ -41,7 +80,11 @@ except ImportError as e:
 # ============================================
 # SINGLE CAMERA CONFIGURATION
 # ============================================
-SINGLE_CAMERA_URL = "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25"
+# For local development (your PC):
+# SINGLE_CAMERA_URL = "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25"
+
+# For server deployment - CHANGE THIS IP TO YOUR SERVER'S CAMERA IP:
+SINGLE_CAMERA_URL = os.getenv("CAMERA_URL", "rtsp://admin:admin1234@10.3.8.9:554/cam/realmonitor?channel=7&subtype=0&bitrate=4096&fps=25")
 SINGLE_CAMERA_NAME = "RTSP Camera 1"
 SINGLE_CAMERA_TYPE = "entry"  # Can be 'entry' or 'exit'
 # ============================================
@@ -55,8 +98,8 @@ LOG_FILE = os.path.join(os.getenv("LOG_DIR", "logs"), "logs.csv")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:3000")
 WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "ws://localhost:3001")
 
-# 🔍 InsightFace Configuration (RetinaFace + ArcFace) - Use environment variables
-INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' (accurate) or 'buffalo_s' (fast)
+# 🔍 InsightFace Configuration (SCRFD 2.5G + ArcFace) - Use environment variables
+INSIGHTFACE_MODEL = os.getenv("INSIGHTFACE_MODEL", "buffalo_l")  # 'buffalo_l' uses RetinaFace detector (more accurate)
 USE_GPU = os.getenv("USE_GPU", "False").lower() == "true"  # Set to True if CUDA is available for GPU acceleration
 DET_SIZE_VALUE = int(os.getenv("DET_SIZE", "640"))
 DET_SIZE = (DET_SIZE_VALUE, DET_SIZE_VALUE)  # Detection input size - larger = better for small faces
@@ -64,9 +107,16 @@ DET_THRESH = float(os.getenv("DET_THRESH", "0.3"))  # Detection confidence thres
 REC_THRESH = float(os.getenv("REC_THRESH", "0.3"))  # Recognition similarity threshold (lower = stricter)
 
 # 🎨 Image Enhancement
-ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "True").lower() == "true"  # Enable Real-ESRGAN super-resolution (slower but better quality)
+ENABLE_ESRGAN = os.getenv("ENABLE_ESRGAN", "True").lower() == "true"  # Enable Real-ESRGAN super-resolution (VERY slow ~500ms)
 ESRGAN_MODEL_PATH = os.getenv("ESRGAN_MODEL_PATH", "RealESRGAN_x2plus.pth")  # Model file path
 ESRGAN_SCALE = int(os.getenv("ESRGAN_SCALE", "2"))  # Upscaling factor (2x or 4x)
+
+# Enhancement level: "none", "fast", "balanced", "quality"
+# - none: No enhancement (~0ms) - Use original frame
+# - fast: CLAHE only (~10-20ms) - Good for real-time
+# - balanced: CLAHE + sharpening (~50-100ms) - Good quality/speed trade-off
+# - quality: Full enhancement (~500-700ms) - Maximum quality but slow
+ENHANCEMENT_LEVEL = os.getenv("ENHANCEMENT_LEVEL", "fast").lower()
 
 # 📹 Camera Configuration for Security
 CAMERA_WIDTH = 1920   # 1080p width for better far face detection
@@ -100,10 +150,10 @@ perf_faces_recognized = 0
 perf_start_time = time.time()
 
 # 🔍 Scene Change Detection Settings
-SCENE_CHANGE_THRESHOLD = 15.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
+SCENE_CHANGE_THRESHOLD = 2.0  # Threshold for scene change detection (lower = more sensitive) - reduced for better detection
 SCENE_CHANGE_MIN_CONTOUR_AREA = 300  # Minimum contour area to consider for change - reduced for sensitivity
 ENABLE_SCENE_CHANGE_DETECTION = True  # Enable/disable scene change detection
-SCENE_CHANGE_PIXEL_THRESHOLD = 20.0  # Threshold for mean pixel difference method
+SCENE_CHANGE_PIXEL_THRESHOLD = 2.0  # Threshold for mean pixel difference method
 
 def reset_performance_stats():
     """Reset performance monitoring statistics"""
@@ -179,8 +229,8 @@ os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 DETECTED_FACES_DIR = os.path.join(os.getenv("UNKNOWN_FACES_DIR", "unknown_faces"), "all_detected")
 os.makedirs(DETECTED_FACES_DIR, exist_ok=True)
 
-# 🤖 Initialize InsightFace Model (RetinaFace + ArcFace)
-print("🔧 Initializing InsightFace models (RetinaFace + ArcFace)...")
+# 🤖 Initialize InsightFace Model (SCRFD + ArcFace)
+print("🔧 Initializing InsightFace models (SCRFD + ArcFace)...")
 face_app = None
 esrgan_upsampler = None
 
@@ -238,11 +288,12 @@ def initialize_esrgan():
         return False
 
 def initialize_insightface():
-    """Initialize InsightFace FaceAnalysis model"""
+    """Initialize InsightFace FaceAnalysis model with SCRFD 2.5G detector"""
     global face_app
     try:
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if USE_GPU else ['CPUExecutionProvider']
         
+        # buffalo_sc uses SCRFD_2.5G detector (faster and balanced)
         face_app = FaceAnalysis(
             name=INSIGHTFACE_MODEL,
             providers=providers
@@ -255,12 +306,13 @@ def initialize_insightface():
         )
         
         print(f"✅ InsightFace initialized successfully!")
-        print(f"   Model: {INSIGHTFACE_MODEL}")
+        print(f"   Model: {INSIGHTFACE_MODEL} (SCRFD 2.5G detector)")
         print(f"   Providers: {providers}")
         print(f"   Detection size: {DET_SIZE}")
         print(f"   Detection threshold: {DET_THRESH} (lower = more sensitive)")
         print(f"   Recognition threshold: {REC_THRESH}")
         print(f"   Min face size: {MIN_FACE_SIZE}px")
+        print(f"   🎯 SCRFD 2.5G provides fast and accurate detection!")
         return True
     except Exception as e:
         print(f"❌ Failed to initialize InsightFace: {e}")
@@ -283,22 +335,15 @@ def initialize_encodings():
     global known_encodings, known_names
     
     print("🧠 INITIALIZING FACE ENCODINGS...")
+    logger.info("Starting face encodings initialization...")
     
     try:
         with open(ENCODINGS_FILE, "rb") as f:
             data = pickle.load(f)
             # ✅ Utiliser 'embeddings' (clé réelle dans le fichier pickle)
-            encodings = data.get("embeddings", [])
+            known_encodings = data.get("embeddings", [])
             known_names = data.get("names", [])
             
-            # Normalize all encodings
-            known_encodings = []
-            for enc in encodings:
-                emb = np.asarray(enc, dtype=np.float32)
-                norm = np.linalg.norm(emb)
-                if norm > 0:
-                    emb = emb / norm
-                known_encodings.append(emb)
             
         print(f"📊 ENCODING STATISTICS:")
         print(f"   - Total encodings loaded: {len(known_encodings)}")
@@ -317,19 +362,23 @@ def initialize_encodings():
         if not known_encodings:
             print("⚠️  Encodages non valides ou vides. Le système démarrera en mode attente.")
             print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages.")
+            logger.warning("No valid encodings found - starting in detection-only mode")
             known_encodings = []
             known_names = []
         else:
             print(f"✅ {len(known_encodings)} encodages chargés pour {len(set(known_names))} personnes.")
+            logger.info(f"Successfully loaded {len(known_encodings)} encodings for {len(set(known_names))} students")
 
     except FileNotFoundError:
         print("⚠️  Fichier encodings.pkl non trouvé. Le système démarrera en mode attente.")
         print("💡 Ajoutez des étudiants via l'interface web pour générer les encodages automatiquement.")
+        logger.warning("Encodings file not found - starting in detection-only mode")
         known_encodings = []
         known_names = []
     except Exception as e:
         print(f"⚠️  Erreur lors du chargement des encodages: {e}")
         print("💡 Le système démarrera avec des encodages vides.")
+        logger.error(f"Error loading encodings: {e}")
         known_encodings = []
         known_names = []
 
@@ -346,6 +395,8 @@ ws_reconnect_attempts = 0
 max_reconnect_attempts = 10
 reconnect_interval = 5
 ws_lock = Lock()
+ws_last_activity = 0  # Track last WebSocket activity
+ws_check_interval = 60  # Check connection every 60 seconds
 
 # Shutdown event for clean thread exit
 shutdown_event = threading.Event()
@@ -361,57 +412,109 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 def on_message(ws, message):
-    print(f"📨 Message reçu: {message}")
+    global ws_last_activity
+    print(f"📨 WebSocket message received: {message}")
+    ws_last_activity = time.time()
 
 def on_error(ws, error):
-    print(f"❌ Erreur WebSocket: {error}")
+    print(f"❌ WebSocket error: {error}")
+    logger.error(f"WebSocket error: {error}")
     global ws_connected
     with ws_lock:
         ws_connected = False
 
 def on_close(ws, close_status_code, close_msg):
-    print(f"🔌 Connexion WebSocket fermée (Code: {close_status_code}, Message: {close_msg})")
+    print(f"🔌 WebSocket closed (Code: {close_status_code}, Message: {close_msg})")
     global ws_connected
     with ws_lock:
         ws_connected = False
 
 def on_open(ws):
-    print("✅ Connexion WebSocket établie")
-    global ws_connected, ws_reconnect_attempts
+    global ws_connected, ws_reconnect_attempts, ws_last_activity
+    print("✅ WebSocket connected successfully")
+    logger.info("WebSocket connection established")
     with ws_lock:
         ws_connected = True
         ws_reconnect_attempts = 0
+        ws_last_activity = time.time()
+
+def on_ping(ws, message):
+    global ws_last_activity
+    print("🏓 Received ping from server")
+    ws_last_activity = time.time()
+    # websocket-client automatically responds with pong
+
+def on_pong(ws, message):
+    global ws_last_activity
+    print("🏓 Pong sent to server")
+    ws_last_activity = time.time()
 
 def connect_websocket():
-    """Établit la connexion WebSocket"""
+    """Établit la connexion WebSocket avec meilleure gestion des erreurs"""
     global ws, ws_connected
     try:
         if ws:
-            ws.close()
-            
+            try:
+                ws.close()
+            except:
+                pass
+
+        print(f"🔌 Connecting to WebSocket: {WEBSOCKET_URL}")
+
         ws = websocket.WebSocketApp(WEBSOCKET_URL,
                                   on_open=on_open,
                                   on_message=on_message,
                                   on_error=on_error,
-                                  on_close=on_close)
-        
-        # Démarrer la connexion WebSocket dans un thread séparé
-        ws_thread = threading.Thread(target=ws.run_forever, daemon=True)
+                                  on_close=on_close,
+                                  on_ping=on_ping,
+                                  on_pong=on_pong)
+
+        # Configuration pour éviter les reconnexions trop fréquentes
+        # ping_interval=None, ping_timeout=None : laisser le serveur gérer les ping/pong
+        # reconnect=10 : attendre 10 secondes avant de reconnecter
+        ws_thread = threading.Thread(
+            target=lambda: ws.run_forever(
+                ping_interval=None,  # Désactiver les ping du client
+                ping_timeout=None,   # Désactiver le timeout ping du client
+                reconnect=10         # Attendre 10 secondes avant de reconnecter
+            ),
+            daemon=True
+        )
         ws_thread.start()
-        
+
         # Attendre un peu pour la connexion
-        time.sleep(2)
-        
+        time.sleep(3)
+
+        # Vérifier si la connexion a réussi
+        with ws_lock:
+            if ws_connected:
+                print("✅ WebSocket connection established and stable")
+            else:
+                print("⚠️  WebSocket connection attempt completed, but status uncertain")
+
     except Exception as e:
-        print(f"❌ Erreur lors de la connexion WebSocket: {e}")
+        print(f"❌ WebSocket connection failed: {e}")
         with ws_lock:
             ws_connected = False
+
+def check_websocket_connection():
+    """Vérifie périodiquement l'état de la connexion WebSocket"""
+    global ws_connected, ws_last_activity
+
+    current_time = time.time()
+
+    with ws_lock:
+        # Si pas connecté, essayer de reconnecter
+        if not ws_connected:
+            print("🔌 WebSocket not connected, attempting to reconnect...")
+            connect_websocket()
+            return
 
 def send_websocket_message(message):
     """Envoie un message via WebSocket avec retry logic"""
     global ws, ws_connected
     max_retries = 3
-    
+
     for attempt in range(max_retries):
         try:
             with ws_lock:
@@ -422,36 +525,55 @@ def send_websocket_message(message):
             print(f"❌ Erreur envoi WebSocket (tentative {attempt + 1}): {e}")
             with ws_lock:
                 ws_connected = False
-            
+
             if attempt < max_retries - 1:
                 time.sleep(1)
-                
+
     return False
 
-def verify_student_exists(student_id):
-    """Verify if student exists in database before logging attendance"""
-    try:
-        response = requests.get(f"{BACKEND_URL}/api/students", timeout=5)
-        if response.status_code == 200:
-            students = response.json()
-            student_matricules = [str(student.get('matricule')) for student in students if student.get('matricule')]
-            return str(student_id) in student_matricules
+def check_websocket_connection():
+    """Vérifie périodiquement l'état de la connexion WebSocket"""
+    global ws_connected, ws_last_activity
+
+    current_time = time.time()
+
+    with ws_lock:
+        # Si pas connecté, essayer de reconnecter
+        if not ws_connected:
+            print("🔌 WebSocket not connected, attempting to reconnect...")
+            connect_websocket()
+            return
+
+        # Vérifier si on a eu de l'activité récente (ping/pong ou messages)
+        time_since_last_activity = current_time - ws_last_activity
+        if time_since_last_activity > 120:  # 2 minutes sans activité
+            print(f"⚠️  No WebSocket activity for {time_since_last_activity:.0f} seconds, reconnecting...")
+            ws_connected = False
+            connect_websocket()
         else:
-            print(f"⚠️  Impossible de vérifier l'étudiant {student_id} (erreur {response.status_code})")
-            return True  # Continue anyway if API is down
-    except Exception as e:
-        print(f"⚠️  Erreur vérification étudiant {student_id}: {e}")
-        return True  # Continue anyway if connection fails
+            print(f"✅ WebSocket healthy (last activity: {time_since_last_activity:.0f}s ago)")
+
+# def verify_student_exists(student_id):
+#     """Verify if student exists in database before logging attendance"""
+#     try:
+#         response = requests.get(f"{BACKEND_URL}/api/students", timeout=5)
+#         if response.status_code == 200:
+#             students = response.json()
+#             student_matricules = [str(student.get('matricule')) for student in students if student.get('matricule')]
+#             return str(student_id) in student_matricules
+#         else:
+#             print(f"⚠️  Impossible de vérifier l'étudiant {student_id} (erreur {response.status_code})")
+#             return True  # Continue anyway if API is down
+#     except Exception as e:
+#         print(f"⚠️  Erreur vérification étudiant {student_id}: {e}")
+#         return True  # Continue anyway if connection fails
 
 def log_attendance(student_id, camera_type, confidence):
     """Enregistre la présence dans le fichier CSV et envoie au backend"""
     
     print(f"🎯 RECOGNITION DETECTED: Student {student_id} on {camera_type} camera (confidence: {confidence:.3f})")
+    logger.info(f"Attendance logged: Student={student_id}, Camera={camera_type}, Confidence={confidence:.3f}")
     
-    # Verify student exists in database first
-    if not verify_student_exists(student_id):
-        print(f"⚠️  Étudiant {student_id} non trouvé en base de données - présence ignorée")
-        return
     
     now = datetime.datetime.now()
     timestamp_csv = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -480,18 +602,43 @@ def log_attendance(student_id, camera_type, confidence):
     else:
         print("❌ Échec envoi WebSocket")
 
-def save_unknown_face(frame, face_location):
-    """Sauvegarde un visage inconnu"""
+def draw_arrow_above_face(frame, face_location):
+    """
+    Draw a small arrow above an unknown face
+    """
     top, right, bottom, left = face_location
-    face_image = frame[top:bottom, left:right]
+    face_width = right - left
     
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    unknown_id = f"inconnu_{hash(str(face_location)) % 100000000:08x}"
-    filename = f"{unknown_id}_{timestamp}.jpg"
-    filepath = os.path.join(UNKNOWN_DIR, filename)
+    # Calculate arrow position (centered above the face)
+    arrow_tip_x = left + face_width // 2
+    arrow_tip_y = top - 10  # 10 pixels above the face
     
-    cv2.imwrite(filepath, face_image)
-    print(f"💾 Visage inconnu sauvegardé: {filename}")
+    # Arrow dimensions
+    arrow_length = 30
+    arrow_head_size = 10
+    
+    # Draw arrow shaft (vertical line)
+    cv2.line(frame, 
+             (arrow_tip_x, arrow_tip_y), 
+             (arrow_tip_x, arrow_tip_y - arrow_length), 
+             (0, 0, 255),  # Red color
+             2)
+    
+    # Draw arrow head (two lines forming a V)
+    cv2.line(frame,
+             (arrow_tip_x, arrow_tip_y),
+             (arrow_tip_x - arrow_head_size, arrow_tip_y - arrow_head_size),
+             (0, 0, 255),  # Red color
+             2)
+    cv2.line(frame,
+             (arrow_tip_x, arrow_tip_y),
+             (arrow_tip_x + arrow_head_size, arrow_tip_y - arrow_head_size),
+             (0, 0, 255),  # Red color
+             2)
+    
+    
+    return frame
+
 
 def save_detected_face(frame, face_location, label="detected", confidence=0.0):
     """Save every detected face to the detected_faces directory"""
@@ -522,6 +669,38 @@ def listen_for_quit():
                 break
         except:
             pass
+
+def reconnect_camera(camera_data, max_retries=5):
+    """Reconnect to RTSP camera with retry logic"""
+    for attempt in range(1, max_retries + 1):
+        print(f"🔄 Tentative de reconnexion {attempt}/{max_retries} pour {camera_data['name']}")
+        
+        try:
+            cap = cv2.VideoCapture(camera_data['url'], cv2.CAP_FFMPEG)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+                cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                
+                ret, frame = cap.read()
+                if ret:
+                    print(f"✅ Caméra reconnectée avec succès (tentative {attempt})")
+                    return cap
+                else:
+                    cap.release()
+            else:
+                if cap:
+                    cap.release()
+        except Exception as e:
+            print(f"❌ Erreur lors de la tentative {attempt}: {e}")
+        
+        if attempt < max_retries:
+            print(f"⏳ Attente de 2 secondes avant nouvelle tentative...")
+            time.sleep(2)
+    
+    print(f"❌ Échec de reconnexion après {max_retries} tentatives")
+    return None
 
 def initialize_single_camera():
     """Initialize the single hardcoded camera"""
@@ -565,100 +744,200 @@ def initialize_single_camera():
 
 def enhance_image_for_face_detection(frame):
     """
-    Enhanced image preprocessing with optional ESRGAN super-resolution
-    Falls back to OpenCV enhancement if ESRGAN is not available
+    Configurable image preprocessing for face detection
+    Speed: none (0ms) < fast (10-20ms) < balanced (50-100ms) < quality (500-700ms) < ESRGAN (very slow)
     """
     global esrgan_upsampler, esrgan_enabled
     
-    # Try ESRGAN enhancement first if enabled
+    # Try ESRGAN enhancement first if enabled (VERY SLOW)
     if esrgan_enabled and esrgan_upsampler is not None:
         try:
-            # Apply Real-ESRGAN super-resolution
-            enhanced_frame, _ = esrgan_upsampler.enhance(frame, outscale=ESRGAN_SCALE)
+            # ✅ Step 1: Apply bilateral filter for denoising before ESRGAN
+            # This removes noise while preserving edges, giving ESRGAN cleaner input
+            denoised_frame = cv2.bilateralFilter(frame, 5, 50, 50)
+            print(f"   🧹 Bilateral denoising applied before ESRGAN")
+            
+            # ✅ Step 2: Optional CLAHE for better contrast before upscaling
+            lab = cv2.cvtColor(denoised_frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            l = clahe.apply(l)
+            preprocessed = cv2.merge([l, a, b])
+            preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_LAB2BGR)
+            print(f"   📊 CLAHE preprocessing applied before ESRGAN")
+            
+            # ✅ Step 3: Apply Real-ESRGAN super-resolution on preprocessed image
+            enhanced_frame, _ = esrgan_upsampler.enhance(preprocessed, outscale=ESRGAN_SCALE)
             print(f"   🎨 ESRGAN enhancement applied ({ESRGAN_SCALE}x upscaling)")
+            
+            # ✅ Step 4: Optional sharpening after ESRGAN for crisp details
+            kernel = np.array([[-0.5, -0.5, -0.5],
+                               [-0.5,  5.0, -0.5],
+                               [-0.5, -0.5, -0.5]])
+            enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+            print(f"   ✨ Post-ESRGAN sharpening applied")
+            
             return enhanced_frame
         except Exception as e:
-            print(f"   ⚠️  ESRGAN failed: {e}, falling back to OpenCV")
-            # Continue to OpenCV enhancement below
+            print(f"   ⚠️  ESRGAN failed: {e}, falling back to {ENHANCEMENT_LEVEL}")
+            # Continue to configured enhancement below
     
-    # OpenCV-based enhancement (fallback or if ESRGAN disabled)
-    # Step 1: Reduce glare and overexposure using white balance correction
-    result = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-    avg_a = np.average(result[:, :, 1])
-    avg_b = np.average(result[:, :, 2])
-    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 0.3)
-    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 0.3)
-    balanced_frame = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    # No enhancement - use original frame
+    if ENHANCEMENT_LEVEL == "none":
+        print("   ⚡ No enhancement (original frame)")
+        return frame
     
-    # Step 2: Apply bilateral filter to reduce noise while preserving edges
-    denoised = cv2.bilateralFilter(balanced_frame, 5, 50, 50)
+    # Fast enhancement - CLAHE only (~10-20ms)
+    elif ENHANCEMENT_LEVEL == "fast":
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced_gray = clahe.apply(gray)
+        enhanced_frame = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2BGR)
+        print("   ⚡ Fast enhancement (CLAHE only)")
+        return enhanced_frame
     
-    # Step 3: Convert to LAB color space for advanced contrast enhancement
-    lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    # Balanced enhancement - CLAHE + sharpening (~50-100ms)
+    elif ENHANCEMENT_LEVEL == "balanced":
+        # Convert to LAB for better CLAHE
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        
+        # Apply CLAHE to L channel
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l)
+        
+        # Merge and convert back
+        enhanced_frame = cv2.merge([l_enhanced, a, b])
+        enhanced_frame = cv2.cvtColor(enhanced_frame, cv2.COLOR_LAB2BGR)
+        
+        # Light sharpening
+        kernel = np.array([[-0.5, -0.5, -0.5],
+                           [-0.5,  5.0, -0.5],
+                           [-0.5, -0.5, -0.5]])
+        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+        
+        print("   ⚖️  Balanced enhancement (CLAHE + sharpen)")
+        return enhanced_frame
     
-    # Step 4: Adaptive CLAHE with higher clip limit for harsh outdoor lighting
-    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
-    l_enhanced = clahe.apply(l)
+    # Quality enhancement - Full pipeline (~500-700ms)
+    elif ENHANCEMENT_LEVEL == "quality":
+        # Step 1: White balance correction
+        result = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        avg_a = np.average(result[:, :, 1])
+        avg_b = np.average(result[:, :, 2])
+        result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 0.3)
+        result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 0.3)
+        balanced_frame = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+        
+        # Step 2: Bilateral filter (noise reduction)
+        denoised = cv2.bilateralFilter(balanced_frame, 5, 50, 50)
+        
+        # Step 3: CLAHE
+        lab = cv2.cvtColor(denoised, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
+        l_enhanced = clahe.apply(l)
+        
+        # Step 4: Morphological operations
+        kernel_morph = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        l_enhanced = cv2.morphologyEx(l_enhanced, cv2.MORPH_CLOSE, kernel_morph)
+        
+        lab_enhanced = cv2.merge([l_enhanced, a, b])
+        enhanced_frame = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+        
+        # Step 5: Histogram equalization
+        yuv = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2YUV)
+        yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])
+        enhanced_frame = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+        
+        # Step 6: Sharpening
+        kernel = np.array([[-1, -1, -1],
+                           [-1,  9, -1],
+                           [-1, -1, -1]]) / 1.0
+        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
+        
+        # Step 7: Gamma correction
+        gray = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2GRAY)
+        mean_brightness = np.mean(gray)
+        
+        if mean_brightness > 150:
+            gamma = 0.8
+        elif mean_brightness < 80:
+            gamma = 1.4
+        else:
+            gamma = 1.1
+        
+        lookUpTable = np.empty((1, 256), np.uint8)
+        for i in range(256):
+            lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
+        enhanced_frame = cv2.LUT(enhanced_frame, lookUpTable)
+        
+        # Step 8: Detail enhancement
+        enhanced_frame = cv2.detailEnhance(enhanced_frame, sigma_s=10, sigma_r=0.15)
+        
+        print("   💎 Quality enhancement (full pipeline)")
+        return enhanced_frame
     
-    # Step 5: Apply morphological operations to reduce harsh shadows
-    kernel_morph = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    l_enhanced = cv2.morphologyEx(l_enhanced, cv2.MORPH_CLOSE, kernel_morph)
-    
-    # Merge channels back
-    lab_enhanced = cv2.merge([l_enhanced, a, b])
-    enhanced_frame = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
-    
-    # Step 6: Adaptive histogram equalization on each color channel
-    yuv = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2YUV)
-    yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])
-    enhanced_frame = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
-    
-    # Step 7: Enhanced sharpening for better edge detection
-    kernel = np.array([[-1, -1, -1],
-                       [-1,  9, -1],
-                       [-1, -1, -1]]) / 1.0
-    enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
-    
-    # Step 8: Adaptive gamma correction based on image brightness
-    gray = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2GRAY)
-    mean_brightness = np.mean(gray)
-    
-    if mean_brightness > 150:
-        gamma = 0.8
-    elif mean_brightness < 80:
-        gamma = 1.4
     else:
-        gamma = 1.1
-    
-    lookUpTable = np.empty((1, 256), np.uint8)
-    for i in range(256):
-        lookUpTable[0, i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
-    enhanced_frame = cv2.LUT(enhanced_frame, lookUpTable)
-    
-    # Step 9: Final detail enhancement for outdoor scenes
-    enhanced_frame = cv2.detailEnhance(enhanced_frame, sigma_s=10, sigma_r=0.15)
-    
-    print("   🎨 OpenCV enhancement applied")
-    return enhanced_frame
+        # Default to fast if invalid level
+        print(f"   ⚠️  Invalid ENHANCEMENT_LEVEL: {ENHANCEMENT_LEVEL}, using 'fast'")
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced_gray = clahe.apply(gray)
+        enhanced_frame = cv2.cvtColor(enhanced_gray, cv2.COLOR_GRAY2BGR)
+        return enhanced_frame
 
 def process_frame(frame, camera_type, camera_name):
     """
-    Process frame for face recognition
+    Process frame for face recognition using SCRFD detector
     Optimized for security cameras with far face detection
     """
-    global known_encodings, known_names, frame_count
+    global known_encodings, known_names, frame_count, previous_frames
     
-    # ⏱️ Start timing - Frame enters processing
     frame_start_time = time.time()
-    print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
-    print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-    
     results = []
     frame_count += 1
 
     # Get original frame dimensions
     height, width = frame.shape[:2]
+    
+    # ⏱️ Scene change detection (intelligent frame skipping)
+    if ENABLE_INTELLIGENT_FRAME_SKIPPING and camera_name in previous_frames:
+        scene_change_start = time.time()
+        
+        # Convert both frames to grayscale for comparison
+        gray_current = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray_previous = cv2.cvtColor(previous_frames[camera_name], cv2.COLOR_BGR2GRAY)
+        
+        # Calculate absolute difference
+        frame_diff = cv2.absdiff(gray_previous, gray_current)
+        
+        # Apply threshold
+        _, thresh = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
+        
+        # Calculate percentage of changed pixels
+        changed_pixels = np.sum(thresh > 0)
+        total_pixels = thresh.size
+        change_percentage = (changed_pixels / total_pixels) * 100
+        
+        scene_change_time = (time.time() - scene_change_start) * 1000
+        
+        # Skip frame if change is below threshold
+        if change_percentage < SCENE_CHANGE_PIXEL_THRESHOLD:
+            # 🔇 No logs for skipped frames
+            return results
+        else:
+            # 🔄 Movement detected - processing frame
+            # ⏱️ Start timing - Frame enters processing
+            
+            print(f"\n⏱️  ========== FRAME {frame_count + 1} START ==========")
+            print(f"⏱️  Frame capture time: {datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+            
+            print(f"🔄 Movement detected ({change_percentage:.2f}% change) - Processing frame")
+            pass
+    
+    # Store current frame for next comparison
+    previous_frames[camera_name] = frame.copy()
 
     # ⏱️ Enhancement start
     enhancement_start = time.time()
@@ -669,12 +948,26 @@ def process_frame(frame, camera_type, camera_name):
 
     # ⏱️ Detection start
     detection_start = time.time()
-    # Use InsightFace RetinaFace for detection
+    # Use InsightFace SCRFD for detection
     face_locations = []
     face_data_list = []
+    face_det_scores = []  # Store detection confidence for each face
+    detection_time = 0  # Initialize to avoid UnboundLocalError
+    
+    # Check if face_app is initialized
+    if face_app is None:
+        detection_time = (time.time() - detection_start) * 1000
+        print(f"❌ Face detection skipped - InsightFace not initialized")
+        print(f"⏱️  Face detection (SCRFD 2.5G): {detection_time:.2f}ms")
+        
+        # Skip to end with empty results
+        total_time = (time.time() - frame_start_time) * 1000
+        print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
+        print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(SCRFD)={detection_time:.0f}ms | Embedding=0ms | Recognition=0ms\n")
+        return results
     
     try:
-        # Detect faces with RetinaFace on BOTH original and enhanced frames
+        # Detect faces with SCRFD on BOTH original and enhanced frames
         # Try enhanced frame first (better quality)
         faces = face_app.get(enhanced_frame)
         
@@ -694,29 +987,38 @@ def process_frame(frame, camera_type, camera_name):
             face_width = right - left
             face_height = bottom - top
             
+            # Get detection confidence score
+            det_score = float(face.det_score) if hasattr(face, 'det_score') else 0.0
+            
             # Filter faces that are too small (reduced threshold)
             if face_width >= MIN_FACE_SIZE and face_height >= MIN_FACE_SIZE:
                 face_locations.append((top, right, bottom, left))
                 face_data_list.append(face)
-                print(f"   ✅ Face {len(face_locations)}: size={face_width}x{face_height}px, location=({left},{top})-({right},{bottom})")
+                face_det_scores.append(det_score)
+                print(f"   ✅ Face {len(face_locations)}: size={face_width}x{face_height}px, confidence={det_score:.3f}, location=({left},{top})-({right},{bottom})")
         
         detection_time = (time.time() - detection_start) * 1000
-        print(f"⏱️  Face detection: {detection_time:.2f}ms")
-        print(f"🎯 RETINAFACE DETECTION RESULTS for {camera_name}:")
+        print(f"⏱️  Face detection (SCRFD 2.5G): {detection_time:.2f}ms")
+        print(f"🎯 SCRFD 2.5G DETECTION RESULTS for {camera_name}:")
         print(f"   - Total faces detected: {len(faces)}")
         print(f"   - After size filtering (>={MIN_FACE_SIZE}px): {len(face_locations)}")
+        logger.info(f"Face detection: {len(faces)} faces found, {len(face_locations)} after filtering (Camera: {camera_name})")
     
     except Exception as e:
+        detection_time = (time.time() - detection_start) * 1000
         print(f"❌ Error during face detection: {e}")
         import traceback
         traceback.print_exc()
         faces = []
         face_data_list = []
+        face_locations = []  # Ensure it's initialized
 
     # ⏱️ Embedding extraction start
     embedding_start = time.time()
     # Get face embeddings from detected faces
     face_embeddings = []
+    embedding_time = 0  # Initialize to avoid UnboundLocalError
+    
     if face_locations:
         # Extract and normalize embeddings from face objects
         for face in face_data_list:
@@ -735,9 +1037,10 @@ def process_frame(frame, camera_type, camera_name):
     if not known_encodings or len(known_encodings) == 0:
         print(f"⚠️  No encodings available - {len(face_locations)} faces detected will be saved")
         # Save ALL detected faces
-        for face_location in face_locations:
-            save_detected_face(frame, face_location, label="unknown", confidence=0.0)
-            save_unknown_face(frame, face_location)
+        for i, face_location in enumerate(face_locations):
+            det_score = face_det_scores[i] if i < len(face_det_scores) else 0.0
+            # save_detected_face(frame, face_location, label="unknown", confidence=det_score)
+            # save_unknown_face(frame, face_location, confidence=det_score)
         
         total_time = (time.time() - frame_start_time) * 1000
         print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========\n")
@@ -747,13 +1050,21 @@ def process_frame(frame, camera_type, camera_name):
     
     # ⏱️ Recognition start
     recognition_start = time.time()
+    recognition_time = 0  # Initialize to avoid UnboundLocalError
     current_time = time.time()
     
     # Convert known_encodings to numpy array for efficient computation
     known_encodings_array = np.array(known_encodings)
     
+    # Track unknown faces to draw arrows later
+    unknown_face_locations = []
+    frame_with_arrows = frame.copy()  # Create a copy to draw on
+    
     for i, (face_embedding, face_location) in enumerate(zip(face_embeddings, face_locations)):
         print(f"  👤 Processing face {i+1}/{len(face_embeddings)} at location {face_location}")
+        
+        # Get detection confidence for this face
+        det_score = face_det_scores[i] if i < len(face_det_scores) else 0.0
         
         # Compute cosine similarity with all known faces
         similarities = np.dot(known_encodings_array, face_embedding)
@@ -769,9 +1080,10 @@ def process_frame(frame, camera_type, camera_name):
             confidence = best_similarity
             
             print(f"     ✅ RECOGNIZED: {name} (confidence: {confidence:.3f})")
+            logger.info(f"Face recognized: Student={name}, Confidence={confidence:.3f}, Location={face_location}")
             
             # 💾 Save the recognized face
-            save_detected_face(frame, face_location, label=name, confidence=confidence)
+            # save_detected_face(frame, face_location, label=name, confidence=confidence)
             
             # ⏱️ Log attendance start
             log_start = time.time()
@@ -783,10 +1095,27 @@ def process_frame(frame, camera_type, camera_name):
                 log_time = (time.time() - log_start) * 1000
                 print(f"⏱️  Attendance logging: {log_time:.2f}ms")
         else:
-            print(f"     ❌ No match found - face will be saved as unknown")
-            # 💾 Save the unknown face
-            save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
-            save_unknown_face(frame, face_location)
+            print(f"     ❌ No match found - will draw arrow above face")
+            # Add to unknown faces list
+            unknown_face_locations.append(face_location)
+            # 💾 Save individual detected face for reference
+            # save_detected_face(frame, face_location, label="unknown", confidence=best_similarity)
+    
+    # If there are unknown faces, draw arrows and save the frame
+    if unknown_face_locations:
+        print(f"🔴 Found {len(unknown_face_locations)} unknown face(s) - drawing arrows and saving frame")
+        logger.warning(f"Unknown faces detected: {len(unknown_face_locations)} faces (Camera: {camera_name})")
+        
+        # Draw arrows above all unknown faces
+        for face_location in unknown_face_locations:
+            frame_with_arrows = draw_arrow_above_face(frame_with_arrows, face_location)
+        
+        # Save the frame with arrows
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"unknown_frame_{timestamp}_{len(unknown_face_locations)}faces.jpg"
+        filepath = os.path.join(UNKNOWN_DIR, filename)
+        cv2.imwrite(filepath, frame_with_arrows)
+        print(f"💾 Frame with {len(unknown_face_locations)} unknown face(s) saved: {filename}")
     
     recognition_time = (time.time() - recognition_start) * 1000
     print(f"⏱️  Face recognition: {recognition_time:.2f}ms")
@@ -794,7 +1123,7 @@ def process_frame(frame, camera_type, camera_name):
     # ⏱️ Total frame processing time
     total_time = (time.time() - frame_start_time) * 1000
     print(f"⏱️  ========== FRAME {frame_count} COMPLETE: {total_time:.2f}ms ==========")
-    print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection={detection_time:.0f}ms | Embedding={embedding_time:.0f}ms | Recognition={recognition_time:.0f}ms\n")
+    print(f"⏱️  Breakdown: Enhancement={enhancement_time:.0f}ms | Detection(SCRFD)={detection_time:.0f}ms | Embedding={embedding_time:.0f}ms | Recognition={recognition_time:.0f}ms\n")
     
     return results
 
@@ -806,10 +1135,18 @@ def main():
     # Initialize encodings first
     initialize_encodings()
     
-    print("🚀 Démarrage du système de reconnaissance faciale (Single Camera Mode)...")
+    print("🚀 Démarrage du système de reconnaissance faciale (Single Camera Mode - SCRFD 2.5G)...")
     print(f"📹 Camera URL: {SINGLE_CAMERA_URL}")
     print(f"📹 Camera Name: {SINGLE_CAMERA_NAME}")
     print(f"📹 Camera Type: {SINGLE_CAMERA_TYPE}")
+    print(f"🎯 Using SCRFD 2.5G detector for fast and accurate face detection!")
+    logger.info("=" * 50)
+    logger.info("Face Recognition System Starting")
+    logger.info(f"Camera: {SINGLE_CAMERA_NAME} ({SINGLE_CAMERA_TYPE})")
+    logger.info(f"URL: {SINGLE_CAMERA_URL}")
+    logger.info(f"Detection Model: SCRFD 2.5G")
+    logger.info(f"Enhancement Level: {ENHANCEMENT_LEVEL}")
+    logger.info("=" * 50)
     
     # Établir la connexion WebSocket
     connect_websocket()
@@ -824,7 +1161,10 @@ def main():
     
     if not camera_data:
         print("❌ Impossible d'initialiser la caméra. Le programme va s'arrêter.")
+        logger.error("Failed to initialize camera - system shutdown")
         return
+    
+    logger.info(f"Camera initialized successfully: {camera_data['name']}")
     
     # Start listener thread for quit commands
     listener_thread = threading.Thread(target=listen_for_quit, daemon=True)
@@ -838,6 +1178,9 @@ def main():
     camera_type = camera_data['type']
     
     frame_skip_counter = 0
+    websocket_check_counter = 0
+    camera_failure_count = 0  # Track consecutive failures
+    MAX_CAMERA_FAILURES = 10  # Restart container after 10 failures
 
     try:
         while not shutdown_event.is_set():
@@ -845,14 +1188,41 @@ def main():
             if shutdown_event.is_set():
                 print("🔄 Signal d'arrêt détecté, arrêt du traitement...")
                 break
+
+            # Periodic WebSocket health check (every 60 seconds)
+            # websocket_check_counter += 1
+            # if websocket_check_counter >= 600:  # 60 seconds * 10 iterations per second
+            #     check_websocket_connection()
+            #     websocket_check_counter = 0
             
             # Read frame from camera
             ret, frame = cap.read()
             
             if not ret:
-                print(f"❌ Erreur lecture caméra {camera_name}")
+                camera_failure_count += 1
+                print(f"❌ Erreur lecture caméra {camera_name} (échec {camera_failure_count}/{MAX_CAMERA_FAILURES})")
+                
+                # Try to reconnect after 3 consecutive failures
+                if camera_failure_count >= 3:
+                    print("🔄 Tentative de reconnexion de la caméra...")
+                    logger.warning(f"Camera connection lost - attempting reconnection (failures: {camera_failure_count})")
+                    cap.release()
+                    new_cap = reconnect_camera(camera_data, max_retries=5)
+                    
+                    if new_cap:
+                        cap = new_cap
+                        camera_failure_count = 0  # Reset failure counter
+                        print("✅ Caméra reconnectée avec succès - reprise du traitement")
+                    elif camera_failure_count >= MAX_CAMERA_FAILURES:
+                        print("❌ Nombre maximum d'échecs atteint - arrêt pour redémarrage du conteneur")
+                        shutdown_event.set()
+                        sys.exit(1)  # Exit with error code to trigger container restart
+                
                 time.sleep(1)
                 continue
+            
+            # Reset failure counter on successful frame read
+            camera_failure_count = 0
             
             # Increment frame skip counter
             frame_skip_counter += 1
@@ -867,9 +1237,11 @@ def main():
             
     except KeyboardInterrupt:
         print("\n🛑 Arrêt par Ctrl+C")
+        logger.info("System shutdown requested (Ctrl+C)")
         shutdown_event.set()
     finally:
         # Nettoyer les ressources
+        logger.info("Cleaning up resources...")
         shutdown_event.set()
         
         if cap:
